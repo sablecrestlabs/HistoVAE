@@ -60,7 +60,7 @@ pip install -r requirements.txt
 
 ### Train
 
-Point `--data-root` at a directory containing WSI `.tif` / `.TIF` files (recursively searched):
+Point `--data-root` at a directory containing WSI `.tif` / `.svs` files (recursively searched):
 
 ```bash
 python vae.py --data-root /path/to/wsi_tifs
