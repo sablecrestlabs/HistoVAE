@@ -79,6 +79,8 @@ docker run --rm -it --gpus all \
   histovae
 ```
 
+## Bare metal
+
 ### Requirements
 
 - Python 3.9+
