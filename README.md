@@ -143,8 +143,6 @@ model.load_state_dict(ckpt["model_state_dict"], strict=True)
 model.eval()
 ```
 
-Note: [pretrained/vae_trained.pt](pretrained/vae_trained.pt) is a checkpoint file after training to convergence on CAMELYON17.
-
 ## License
 
 Dual-licensed under **MIT** and **Apache 2.0**.
