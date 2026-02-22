@@ -192,10 +192,6 @@ model.load_state_dict(ckpt["model_state_dict"], strict=True)
 model.eval()
 ```
 
-## Status
-
-Actively maintained.
-
 ## License
 
 Dual-licensed under **MIT** and **Apache 2.0**.
