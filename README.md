@@ -1,3 +1,5 @@
+![Banner](HistoVAE_banner.png)
+
 # HistoVAE
 
 [![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen)](#status)
