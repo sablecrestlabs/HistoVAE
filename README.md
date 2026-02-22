@@ -18,7 +18,7 @@ This repo trains directly on random WSI tiles via OpenSlide and is designed to c
 - Optional convenience scripts:
   - [train_vae.sh](train_vae.sh) (example invocation)
   - [tensorboard.sh](tensorboard.sh) (runs TensorBoard via Docker)
-- Example weights: [pretrained/HistoVAE_trained.pt](pretrained/vae_trained.pt)
+- Example weights: [pretrained/vae_trained.pt](pretrained/vae_trained.pt)
 
 ### Model/training highlights
 
@@ -31,6 +31,53 @@ Implemented in [vae.py](vae.py):
 - OpenSlide-backed dataset that samples random tiles and filters empty/background tiles
 
 ## Quickstart
+
+## Run with Docker (GPU)
+
+This repo includes a GPU-capable Docker image (Ubuntu base + CUDA-enabled PyTorch installed via pip). To use the GPU, you’ll need:
+
+- NVIDIA drivers installed on the host
+- Docker + NVIDIA Container Toolkit (so `--gpus all` works)
+
+### Build
+
+```bash
+docker build -t histovae .
+```
+
+Defaults are set in the Dockerfile (`PYTORCH_VERSION=2.10.0`, `CUDA_VERSION=13.0`). You can override them:
+
+```bash
+docker build -t histovae \
+  --build-arg PYTORCH_VERSION=2.10.0 \
+  --build-arg CUDA_VERSION=13.0 \
+  .
+```
+
+The image sets `CUDA_VERSION` inside the container as an environment variable as well.
+
+### Train (mount host data directory)
+
+Mount your WSI directory from the host into `/data` in the container:
+
+```bash
+docker run --rm --gpus all \
+  -v /host/path/to/wsi:/data:ro \
+  -v "$PWD/runs_vae:/workspace/runs_vae" \
+  -v "$PWD/checkpoints_vae:/workspace/checkpoints_vae" \
+  histovae \
+  --data-root /data \
+  --device cuda
+```
+
+If you want a shell instead of running training, override the entrypoint:
+
+```bash
+docker run --rm -it --gpus all \
+  -v /host/path/to/wsi:/data:ro \
+  --entrypoint bash \
+  histovae
+```
 
 ### Requirements
 
@@ -142,6 +189,10 @@ model = VAE(config=config)
 model.load_state_dict(ckpt["model_state_dict"], strict=True)
 model.eval()
 ```
+
+## Status
+
+Actively maintained.
 
 ## License
 
