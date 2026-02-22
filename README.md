@@ -18,7 +18,7 @@ This repo trains directly on random WSI tiles via OpenSlide and is designed to c
 - Optional convenience scripts:
   - [train_vae.sh](train_vae.sh) (example invocation)
   - [tensorboard.sh](tensorboard.sh) (runs TensorBoard via Docker)
-- Example weights: [pretrained/vae_trained.pt](pretrained/vae_trained.pt)
+- Example weights: [pretrained/HistoVAE_trained.pt](pretrained/vae_trained.pt)
 
 ### Model/training highlights
 
