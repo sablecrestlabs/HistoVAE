@@ -79,7 +79,7 @@ docker run --rm -it --gpus all \
   histovae
 ```
 
-## Bare metal
+## Run on bare metal
 
 ### Requirements
 
