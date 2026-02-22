@@ -1332,7 +1332,7 @@ class OpenSlideTileDataset(Dataset):
     """
     PyTorch Dataset that extracts random tiles from TIF files using OpenSlide.
 
-    Scans a directory for .tif files and extracts random tiles.
+    Scans a directory for .tif/.svs files and extracts random tiles.
     Images are returned as tensors in [0, 1] range.
     """
 
@@ -1347,7 +1347,7 @@ class OpenSlideTileDataset(Dataset):
     ):
         """
         Args:
-            data_root: Directory containing .tif files
+            data_root: Directory containing .tif/.svs files
             tile_size: Size of tiles to extract (tile_size x tile_size)
             tiles_per_epoch: Number of tiles per epoch
             level: OpenSlide pyramid level to read from (0 = highest resolution)
@@ -1364,20 +1364,26 @@ class OpenSlideTileDataset(Dataset):
         self.tiles_per_epoch = tiles_per_epoch
         self.level = level
 
-        # Find all .tif files in the directory
+        # Find all .tif/.svs files in the directory
         self.tif_files = glob.glob(os.path.join(data_root, "*.tif"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.TIF"))
+        self.tif_files += glob.glob(os.path.join(data_root, "*.svs"))
+        self.tif_files += glob.glob(os.path.join(data_root, "*.SVS"))
         self.tif_files += glob.glob(os.path.join(data_root,
                                     "**", "*.tif"), recursive=True)
         self.tif_files += glob.glob(os.path.join(data_root,
                                     "**", "*.TIF"), recursive=True)
+        self.tif_files += glob.glob(os.path.join(data_root,
+                                    "**", "*.svs"), recursive=True)
+        self.tif_files += glob.glob(os.path.join(data_root,
+                                    "**", "*.SVS"), recursive=True)
         # Remove duplicates
         self.tif_files = list(set(self.tif_files))
 
         if len(self.tif_files) == 0:
-            raise ValueError(f"No .tif files found in {data_root}")
+            raise ValueError(f"No .tif/.svs files found in {data_root}")
 
-        print(f"Found {len(self.tif_files)} TIF files in {data_root}")
+        print(f"Found {len(self.tif_files)} TIF/SVS files in {data_root}")
 
         # Cache for OpenSlide objects and dimensions (opened lazily)
         self._slide_cache: Dict[str, Any] = {}
@@ -1606,7 +1612,7 @@ def parse_args() -> argparse.Namespace:
 
     # Data
     parser.add_argument("--data-root", type=str, required=True,
-                        help="Directory containing .tif files")
+                        help="Directory containing .tif/.svs files")
     parser.add_argument("--img-size", type=int, default=256,
                         help="Image/tile size (default: 256)")
     parser.add_argument("--img-channels", type=int, default=3,
