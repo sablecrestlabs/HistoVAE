@@ -23,7 +23,7 @@ Trained on a single RTX 5090 with default settings, this implementation demonstr
 - Optional convenience scripts:
   - [train_vae.sh](train_vae.sh) (example invocation)
   - [tensorboard.sh](tensorboard.sh) (runs TensorBoard via Docker)
-- Example weights: [pretrained/vae_trained.pt](pretrained/vae_trained.pt)
+- Example weights: [pretrained/vae_trained.pt](pretrained/vae_trained.pt) trained on [CAMELYON17](https://camelyon17.grand-challenge.org/)
 
 ### Model/training highlights
 
@@ -75,7 +75,7 @@ Mount your WSI directory from the host into `/data` in the container:
 
 ```bash
 docker run --rm --gpus all \
-  -v /host/path/to/wsi:/data:ro \
+  -v /host/path/to/wsi_files:/data:ro \
   -v "$PWD/runs_vae:/workspace/runs_vae" \
   -v "$PWD/checkpoints_vae:/workspace/checkpoints_vae" \
   histovae \
@@ -125,14 +125,14 @@ pip install -r requirements.txt
 Point `--data-root` at a directory containing WSI `.tif` / `.svs` files (case insensitive, recursively searched):
 
 ```bash
-python vae.py --data-root /path/to/wsi_tifs
+python vae.py --data-root /path/to/wsi_files
 ```
 
 Common knobs:
 
 ```bash
 python vae.py \
-  --data-root /path/to/wsi_tifs \
+  --data-root /path/to/wsi_files \
   --img-size 256 \
   --batch-size 8 \
   --tiles-per-epoch 10000 \
@@ -143,6 +143,23 @@ python vae.py \
 ```
 
 By default, tiles are normalized from `[0, 1]` to `[-1, 1]` before being fed to the model.
+
+### Supported Formats
+
+HistoVAE relies on [OpenSlide](https://openslide.org/) for slide access, so the formats it can open are the formats OpenSlide supports on the host system. Supported formats include:
+
+- `.svs`
+- `.tif`
+- `.dcm`
+- `.ndpi`
+- `.vms`
+- `.vmu`
+- `.scn`
+- `.mrxs`
+- `.tiff`
+- `.svslide`
+- `.bif`
+- `.czi`
 
 ### Monitor with TensorBoard
 
