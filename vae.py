@@ -28,6 +28,7 @@ from torch.utils.data import DataLoader, Dataset
 
 try:
     from torch.amp import GradScaler, autocast  # new style
+
     AMP_AVAILABLE = True
 except ImportError:
     AMP_AVAILABLE = False
@@ -35,6 +36,7 @@ except ImportError:
 
 try:
     from torch.utils.tensorboard import SummaryWriter
+
     TENSORBOARD_AVAILABLE = True
 except ImportError:
     TENSORBOARD_AVAILABLE = False
@@ -43,6 +45,7 @@ except ImportError:
 try:
     from torchvision import transforms
     from torchvision.utils import make_grid
+
     TORCHVISION_AVAILABLE = True
 except ImportError:
     TORCHVISION_AVAILABLE = False
@@ -50,6 +53,7 @@ except ImportError:
 
 try:
     import openslide
+
     OPENSLIDE_AVAILABLE = True
 except ImportError:
     OPENSLIDE_AVAILABLE = False
@@ -57,6 +61,7 @@ except ImportError:
 
 try:
     from PIL import Image
+
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
@@ -67,6 +72,7 @@ import glob
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class VAEConfig:
@@ -130,6 +136,7 @@ class VAEConfig:
 # Building Blocks
 # =============================================================================
 
+
 def get_activation(name: str) -> nn.Module:
     """Get activation function by name."""
     if name == "silu":
@@ -192,15 +199,13 @@ class ResidualBlock(nn.Module):
         # First norm + conv
         self.norm1 = get_norm_layer(in_channels, norm_type, norm_num_groups)
         self.act1 = get_activation(activation)
-        self.conv1 = nn.Conv2d(in_channels, out_channels,
-                               kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
 
         # Second norm + conv
         self.norm2 = get_norm_layer(out_channels, norm_type, norm_num_groups)
         self.act2 = get_activation(activation)
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
-        self.conv2 = nn.Conv2d(out_channels, out_channels,
-                               kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
 
         # Skip connection (1x1 conv if channels differ)
         if in_channels != out_channels:
@@ -250,8 +255,9 @@ class SelfAttention2d(nn.Module):
         self.num_heads = num_heads
         self.head_dim = channels // num_heads
 
-        assert channels % num_heads == 0, \
-            f"channels ({channels}) must be divisible by num_heads ({num_heads})"
+        assert (
+            channels % num_heads == 0
+        ), f"channels ({channels}) must be divisible by num_heads ({num_heads})"
 
         self.norm = get_norm_layer(channels, norm_type, norm_num_groups)
 
@@ -261,7 +267,7 @@ class SelfAttention2d(nn.Module):
         # Output projection
         self.proj = nn.Conv2d(channels, channels, kernel_size=1)
 
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, C, H, W = x.shape
@@ -276,8 +282,9 @@ class SelfAttention2d(nn.Module):
         q, k, v = qkv[0], qkv[1], qkv[2]  # Each: (B, num_heads, H*W, head_dim)
 
         # Attention scores
-        attn = torch.matmul(q, k.transpose(-2, -1)) * \
-            self.scale  # (B, num_heads, H*W, H*W)
+        attn = (
+            torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        )  # (B, num_heads, H*W, H*W)
         attn = F.softmax(attn, dim=-1)
 
         # Apply attention to values
@@ -294,8 +301,7 @@ class Downsample(nn.Module):
 
     def __init__(self, channels: int):
         super().__init__()
-        self.conv = nn.Conv2d(channels, channels,
-                              kernel_size=3, stride=2, padding=1)
+        self.conv = nn.Conv2d(channels, channels, kernel_size=3, stride=2, padding=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(x)
@@ -316,6 +322,7 @@ class Upsample(nn.Module):
 # =============================================================================
 # Encoder
 # =============================================================================
+
 
 class Encoder(nn.Module):
     """
@@ -362,8 +369,7 @@ class Encoder(nn.Module):
         self.use_attention_at = set(use_attention_at)
 
         # Initial convolution
-        self.conv_in = nn.Conv2d(
-            in_channels, base_channels, kernel_size=3, padding=1)
+        self.conv_in = nn.Conv2d(in_channels, base_channels, kernel_size=3, padding=1)
 
         # Downsampling stages
         self.stages = nn.ModuleList()
@@ -378,13 +384,15 @@ class Encoder(nn.Module):
             # Residual blocks
             blocks = nn.ModuleList()
             for j in range(num_res_blocks):
-                blocks.append(ResidualBlock(
-                    in_channels=in_ch if j == 0 else out_ch,
-                    out_channels=out_ch,
-                    norm_type=norm_type,
-                    norm_num_groups=norm_num_groups,
-                    activation=activation,
-                ))
+                blocks.append(
+                    ResidualBlock(
+                        in_channels=in_ch if j == 0 else out_ch,
+                        out_channels=out_ch,
+                        norm_type=norm_type,
+                        norm_num_groups=norm_num_groups,
+                        activation=activation,
+                    )
+                )
             stage["blocks"] = blocks
 
             # Attention (added dynamically based on resolution)
@@ -415,7 +423,8 @@ class Encoder(nn.Module):
         # Output: mu and logvar with same spatial dimensions
         # We output 2 * latent_channels and split later
         self.conv_out = nn.Conv2d(
-            final_ch, 2 * latent_channels, kernel_size=3, padding=1)
+            final_ch, 2 * latent_channels, kernel_size=3, padding=1
+        )
 
         # Create attention modules where needed
         self._create_attention_modules()
@@ -481,6 +490,7 @@ class Encoder(nn.Module):
 # Decoder
 # =============================================================================
 
+
 class Decoder(nn.Module):
     """
     VAE Decoder: Maps latent samples to reconstructed images.
@@ -530,8 +540,7 @@ class Decoder(nn.Module):
 
         # Initial conv from latent
         first_ch = base_channels * channel_multipliers_rev[0]
-        self.conv_in = nn.Conv2d(
-            latent_channels, first_ch, kernel_size=3, padding=1)
+        self.conv_in = nn.Conv2d(latent_channels, first_ch, kernel_size=3, padding=1)
 
         # Store for later
         self._channel_multipliers_rev = channel_multipliers_rev
@@ -552,13 +561,15 @@ class Decoder(nn.Module):
             # Residual blocks
             blocks = nn.ModuleList()
             for j in range(num_res_blocks):
-                blocks.append(ResidualBlock(
-                    in_channels=in_ch if j == 0 else out_ch,
-                    out_channels=out_ch,
-                    norm_type=norm_type,
-                    norm_num_groups=norm_num_groups,
-                    activation=activation,
-                ))
+                blocks.append(
+                    ResidualBlock(
+                        in_channels=in_ch if j == 0 else out_ch,
+                        out_channels=out_ch,
+                        norm_type=norm_type,
+                        norm_num_groups=norm_num_groups,
+                        activation=activation,
+                    )
+                )
             stage["blocks"] = blocks
 
             # Attention placeholder
@@ -583,15 +594,16 @@ class Decoder(nn.Module):
         final_ch = base_channels * channel_multipliers_rev[-1]
         self.norm_out = get_norm_layer(final_ch, norm_type, norm_num_groups)
         self.act_out = get_activation(activation)
-        self.conv_out = nn.Conv2d(
-            final_ch, out_channels, kernel_size=3, padding=1)
+        self.conv_out = nn.Conv2d(final_ch, out_channels, kernel_size=3, padding=1)
 
         # Create attention modules
         self._create_attention_modules()
 
     def _create_attention_modules(self) -> None:
         """Create attention modules for specified resolutions."""
-        for i, (stage, mult) in enumerate(zip(self.stages, self._channel_multipliers_rev)):
+        for i, (stage, mult) in enumerate(
+            zip(self.stages, self._channel_multipliers_rev)
+        ):
             ch = self._base_channels * mult
             stage["attn"] = SelfAttention2d(
                 channels=ch,
@@ -600,7 +612,9 @@ class Decoder(nn.Module):
                 norm_num_groups=self._norm_num_groups,
             )
 
-    def forward(self, z: torch.Tensor, target_size: Optional[int] = None) -> torch.Tensor:
+    def forward(
+        self, z: torch.Tensor, target_size: Optional[int] = None
+    ) -> torch.Tensor:
         """
         Decode latent sample to image.
 
@@ -646,6 +660,7 @@ class Decoder(nn.Module):
 # =============================================================================
 # VAE Model
 # =============================================================================
+
 
 class VAE(nn.Module):
     """
@@ -810,8 +825,7 @@ class VAE(nn.Module):
         x_recon = torch.clamp(x_recon, min=-1.0, max=1.0)
 
         # Compute losses
-        recon_loss = reconstruction_loss(
-            x, x_recon, loss_type=self.recon_loss_type)
+        recon_loss = reconstruction_loss(x, x_recon, loss_type=self.recon_loss_type)
         kl_loss = kl_divergence(mu, logvar)
 
         # Clamp individual losses to prevent extreme values
@@ -895,6 +909,7 @@ class VAE(nn.Module):
 # Loss Functions
 # =============================================================================
 
+
 def kl_divergence(mu, logvar, free_nats: float = 0.5):
     # Match clamp here too
     logvar = torch.clamp(logvar, min=-10.0, max=5.0)
@@ -934,6 +949,7 @@ def reconstruction_loss(
 # =============================================================================
 # KL Scheduler
 # =============================================================================
+
 
 class LinearKLScheduler:
     """
@@ -1011,6 +1027,7 @@ class CyclicKLScheduler:
 # =============================================================================
 # Training Utilities
 # =============================================================================
+
 
 def check_for_nan(loss: torch.Tensor, name: str = "loss") -> bool:
     """
@@ -1125,8 +1142,7 @@ def train_epoch(
             if max_grad_norm is not None:
                 # Unscareparameterizele once before clipping (official pattern)
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
 
             # internally checks for NaN/Inf grads and skips update if needed
             scaler.step(optimizer)
@@ -1143,15 +1159,13 @@ def train_epoch(
             loss.backward()
 
             if has_nonfinite_gradients(model):
-                print(
-                    f"Skipping batch {batch_idx} due to non-finite gradients")
+                print(f"Skipping batch {batch_idx} due to non-finite gradients")
                 optimizer.zero_grad(set_to_none=True)
                 continue
 
             # Gradient clipping
             if max_grad_norm is not None:
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
 
             optimizer.step()
 
@@ -1164,22 +1178,21 @@ def train_epoch(
         # Logging
         if writer is not None and global_step % log_interval == 0:
             writer.add_scalar("train/loss", loss.item(), global_step)
-            writer.add_scalar("train/recon_loss",
-                              outputs["recon_loss"].item(), global_step)
             writer.add_scalar(
-                "train/kl_loss", outputs["kl_loss"].item(), global_step)
+                "train/recon_loss", outputs["recon_loss"].item(), global_step
+            )
+            writer.add_scalar("train/kl_loss", outputs["kl_loss"].item(), global_step)
             writer.add_scalar("train/kl_weight", kl_weight, global_step)
             # Log mu and logvar histograms for diagnosing posterior collapse
             if "mu" in outputs and "logvar" in outputs:
+                writer.add_histogram("train/mu", outputs["mu"].detach(), global_step)
                 writer.add_histogram(
-                    "train/mu", outputs["mu"].detach(), global_step)
-                writer.add_histogram(
-                    "train/logvar", outputs["logvar"].detach(), global_step)
+                    "train/logvar", outputs["logvar"].detach(), global_step
+                )
 
         # Image logging
         if writer is not None and global_step % image_log_interval == 0:
-            log_images(writer, x, outputs["x_recon"],
-                       global_step, prefix="train")
+            log_images(writer, x, outputs["x_recon"], global_step, prefix="train")
 
         global_step += 1
 
@@ -1295,7 +1308,13 @@ def log_images(
 # Utility Functions
 # =============================================================================
 
-def has_content(img: Image.Image, min_std: float = 5.0, min_mean: float = 10.0, max_mean: float = 245.0) -> bool:
+
+def has_content(
+    img: Image.Image,
+    min_std: float = 5.0,
+    min_mean: float = 10.0,
+    max_mean: float = 245.0,
+) -> bool:
     """
     Check if an image tile has meaningful content.
 
@@ -1327,6 +1346,7 @@ def has_content(img: Image.Image, min_std: float = 5.0, min_mean: float = 10.0, 
 # =============================================================================
 # OpenSlide Tile Dataset
 # =============================================================================
+
 
 class OpenSlideTileDataset(Dataset):
     """
@@ -1369,14 +1389,18 @@ class OpenSlideTileDataset(Dataset):
         self.tif_files += glob.glob(os.path.join(data_root, "*.TIF"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.svs"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.SVS"))
-        self.tif_files += glob.glob(os.path.join(data_root,
-                                    "**", "*.tif"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root,
-                                    "**", "*.TIF"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root,
-                                    "**", "*.svs"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root,
-                                    "**", "*.SVS"), recursive=True)
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.tif"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.TIF"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.svs"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.SVS"), recursive=True
+        )
         # Remove duplicates
         self.tif_files = list(set(self.tif_files))
 
@@ -1404,7 +1428,9 @@ class OpenSlideTileDataset(Dataset):
         else:
             self.jitter = None
 
-    def _get_slide_with_dims(self, tif_path: str) -> Optional[Tuple[Any, Tuple[int, int]]]:
+    def _get_slide_with_dims(
+        self, tif_path: str
+    ) -> Optional[Tuple[Any, Tuple[int, int]]]:
         """Get or open an OpenSlide object and its dimensions. Returns None if invalid."""
         if tif_path in self._invalid_slides:
             return None
@@ -1434,7 +1460,9 @@ class OpenSlideTileDataset(Dataset):
     def __len__(self) -> int:
         return self.tiles_per_epoch
 
-    def _extract_random_tile(self, max_attempts: int = 50) -> Tuple[Optional[Image.Image], str]:
+    def _extract_random_tile(
+        self, max_attempts: int = 50
+    ) -> Tuple[Optional[Image.Image], str]:
         """Extract a random tile from a random slide (lazy loading).
 
         Returns:
@@ -1462,7 +1490,9 @@ class OpenSlideTileDataset(Dataset):
             max_y = dims[1] - self.tile_size
 
             if max_x <= 0 or max_y <= 0:
-                last_attempt_info = f"{os.path.basename(tif_path)} too small ({dims[0]}x{dims[1]})"
+                last_attempt_info = (
+                    f"{os.path.basename(tif_path)} too small ({dims[0]}x{dims[1]})"
+                )
                 continue
 
             x = random.randint(0, max_x)
@@ -1479,27 +1509,26 @@ class OpenSlideTileDataset(Dataset):
 
                 # Read tile
                 img = slide.read_region(
-                    (level0_x, level0_y),
-                    level,
-                    (self.tile_size, self.tile_size)
+                    (level0_x, level0_y), level, (self.tile_size, self.tile_size)
                 )
 
                 # Convert RGBA to RGB with white background
                 # OpenSlide returns RGBA where transparent areas (outside tissue) have alpha=0
                 # Composite onto white background to avoid black regions
-                if img.mode == 'RGBA':
-                    background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == "RGBA":
+                    background = Image.new("RGB", img.size, (255, 255, 255))
                     # Use alpha channel as mask
                     background.paste(img, mask=img.split()[3])
                     img = background
                 else:
-                    img = img.convert('RGB')
+                    img = img.convert("RGB")
 
                 # Hacky fix: replace near-black pixels with white
                 # Some TIF backgrounds render as black (0,0,0) rather than transparent
                 arr = np.array(img)
-                near_black_mask = (arr[:, :, 0] < 4) & (
-                    arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
+                near_black_mask = (
+                    (arr[:, :, 0] < 4) & (arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
+                )
                 arr[near_black_mask] = [255, 255, 255]
                 img = Image.fromarray(arr)
 
@@ -1511,7 +1540,9 @@ class OpenSlideTileDataset(Dataset):
                     last_attempt_info = f"{os.path.basename(tif_path)} at ({x},{y}) was empty (black/white/uniform)"
 
             except Exception as e:
-                last_attempt_info = f"error reading {os.path.basename(tif_path)} at ({x},{y}): {e}"
+                last_attempt_info = (
+                    f"error reading {os.path.basename(tif_path)} at ({x},{y}): {e}"
+                )
                 continue
 
         # Build detailed debug info
@@ -1567,7 +1598,8 @@ class OpenSlideTileDataset(Dataset):
             # Log occasionally if we're having trouble
             if total_attempts % 100 == 0:
                 print(
-                    f"Warning: Struggled to find valid tile after {total_attempts} attempts. {debug_info}")
+                    f"Warning: Struggled to find valid tile after {total_attempts} attempts. {debug_info}"
+                )
 
         if img is None:
             # This should basically never happen unless all slides are empty
@@ -1606,77 +1638,126 @@ class OpenSlideTileDataset(Dataset):
 # Main Training Script
 # =============================================================================
 
+
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Train VAE on image data")
 
     # Data
-    parser.add_argument("--data-root", type=str, required=True,
-                        help="Directory containing .tif/.svs files")
-    parser.add_argument("--img-size", type=int, default=256,
-                        help="Image/tile size (default: 256)")
-    parser.add_argument("--img-channels", type=int, default=3,
-                        help="Number of image channels")
-    parser.add_argument("--batch-size", type=int, default=8,
-                        help="Batch size")
-    parser.add_argument("--num-workers", type=int, default=12,
-                        help="Number of data loader workers")
-    parser.add_argument("--tiles-per-epoch", type=int, default=10000,
-                        help="Number of tiles per epoch")
-    parser.add_argument("--level", type=int, default=0,
-                        help="OpenSlide pyramid level (0=highest resolution)")
+    parser.add_argument(
+        "--data-root",
+        type=str,
+        required=True,
+        help="Directory containing .tif/.svs files",
+    )
+    parser.add_argument(
+        "--img-size", type=int, default=256, help="Image/tile size (default: 256)"
+    )
+    parser.add_argument(
+        "--img-channels", type=int, default=3, help="Number of image channels"
+    )
+    parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
+    parser.add_argument(
+        "--num-workers", type=int, default=12, help="Number of data loader workers"
+    )
+    parser.add_argument(
+        "--tiles-per-epoch", type=int, default=10000, help="Number of tiles per epoch"
+    )
+    parser.add_argument(
+        "--level",
+        type=int,
+        default=0,
+        help="OpenSlide pyramid level (0=highest resolution)",
+    )
 
     # Model (~8M params with defaults: base=32, mults=1,2,4,8)
-    parser.add_argument("--base-channels", type=int, default=32,
-                        help="Base channel count (default: 32 for ~8M params)")
-    parser.add_argument("--latent-channels", type=int, default=32,
-                        help="Number of latent channels")
-    parser.add_argument("--channel-multipliers", type=str, default="1,2,4",
-                        help="Channel multipliers (comma-separated)")
-    parser.add_argument("--num-res-blocks", type=int, default=2,
-                        help="Residual blocks per stage")
-    parser.add_argument("--use-attention-at", type=str, default="32",
-                        help="Spatial sizes for attention (comma-separated)")
+    parser.add_argument(
+        "--base-channels",
+        type=int,
+        default=32,
+        help="Base channel count (default: 32 for ~8M params)",
+    )
+    parser.add_argument(
+        "--latent-channels", type=int, default=32, help="Number of latent channels"
+    )
+    parser.add_argument(
+        "--channel-multipliers",
+        type=str,
+        default="1,2,4",
+        help="Channel multipliers (comma-separated)",
+    )
+    parser.add_argument(
+        "--num-res-blocks", type=int, default=2, help="Residual blocks per stage"
+    )
+    parser.add_argument(
+        "--use-attention-at",
+        type=str,
+        default="32",
+        help="Spatial sizes for attention (comma-separated)",
+    )
 
     # Training
-    parser.add_argument("--epochs", type=int, default=100,
-                        help="Number of training epochs")
-    parser.add_argument("--lr", type=float, default=1e-4,
-                        help="Learning rate")
-    parser.add_argument("--weight-decay", type=float, default=0.01,
-                        help="Weight decay")
-    parser.add_argument("--beta", type=float, default=0.3,
-                        help="Maximum KL weight (beta-VAE)")
-    parser.add_argument("--kl-warmup-steps", type=int, default=8000,
-                        help="Steps for KL warmup")
-    parser.add_argument("--max-grad-norm", type=float, default=1.0,
-                        help="Max gradient norm (0 to disable)")
-    parser.add_argument("--recon-loss-type", type=str, default="l1",
-                        choices=["l1", "l2"], help="Reconstruction loss type")
+    parser.add_argument(
+        "--epochs", type=int, default=100, help="Number of training epochs"
+    )
+    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
+    parser.add_argument("--weight-decay", type=float, default=0.01, help="Weight decay")
+    parser.add_argument(
+        "--beta", type=float, default=0.3, help="Maximum KL weight (beta-VAE)"
+    )
+    parser.add_argument(
+        "--kl-warmup-steps", type=int, default=8000, help="Steps for KL warmup"
+    )
+    parser.add_argument(
+        "--max-grad-norm",
+        type=float,
+        default=1.0,
+        help="Max gradient norm (0 to disable)",
+    )
+    parser.add_argument(
+        "--recon-loss-type",
+        type=str,
+        default="l1",
+        choices=["l1", "l2"],
+        help="Reconstruction loss type",
+    )
 
     # Mixed precision
-    parser.add_argument("--use-amp", action="store_true", default=True,
-                        help="Use mixed precision training")
-    parser.add_argument("--no-amp", action="store_false", dest="use_amp",
-                        help="Disable mixed precision training")
+    parser.add_argument(
+        "--use-amp",
+        action="store_true",
+        default=True,
+        help="Use mixed precision training",
+    )
+    parser.add_argument(
+        "--no-amp",
+        action="store_false",
+        dest="use_amp",
+        help="Disable mixed precision training",
+    )
 
     # Logging
-    parser.add_argument("--log-dir", type=str, default="runs_vae",
-                        help="TensorBoard log directory")
-    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints_vae",
-                        help="Checkpoint directory")
-    parser.add_argument("--log-interval", type=int, default=100,
-                        help="Steps between logging")
-    parser.add_argument("--save-interval", type=int, default=5,
-                        help="Epochs between checkpoints")
+    parser.add_argument(
+        "--log-dir", type=str, default="runs_vae", help="TensorBoard log directory"
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=str,
+        default="checkpoints_vae",
+        help="Checkpoint directory",
+    )
+    parser.add_argument(
+        "--log-interval", type=int, default=100, help="Steps between logging"
+    )
+    parser.add_argument(
+        "--save-interval", type=int, default=5, help="Epochs between checkpoints"
+    )
 
     # Device
-    parser.add_argument("--device", type=str, default="cuda",
-                        help="Device to use")
+    parser.add_argument("--device", type=str, default="cuda", help="Device to use")
 
     # Reproducibility
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
     return parser.parse_args()
 
@@ -1699,11 +1780,11 @@ def main():
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(
-            f"Total VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+            f"Total VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB"
+        )
 
     # Parse channel multipliers and attention resolutions
-    channel_multipliers = tuple(int(x)
-                                for x in args.channel_multipliers.split(","))
+    channel_multipliers = tuple(int(x) for x in args.channel_multipliers.split(","))
     use_attention_at = tuple(int(x) for x in args.use_attention_at.split(","))
 
     # Create config
@@ -1726,10 +1807,10 @@ def main():
     config.validate()
 
     print(f"\nVAE Configuration:")
+    print(f"  Image size: {config.img_size}x{config.img_size}x{config.img_channels}")
     print(
-        f"  Image size: {config.img_size}x{config.img_size}x{config.img_channels}")
-    print(
-        f"  Latent size: {config.latent_size}x{config.latent_size}x{config.latent_channels}")
+        f"  Latent size: {config.latent_size}x{config.latent_size}x{config.latent_channels}"
+    )
     print(f"  Base channels: {config.base_channels}")
     print(f"  Channel multipliers: {config.channel_multipliers}")
     print(f"  Attention at: {config.use_attention_at}")
@@ -1744,8 +1825,7 @@ def main():
 
     # Count parameters
     num_params = sum(p.numel() for p in model.parameters())
-    num_trainable = sum(p.numel()
-                        for p in model.parameters() if p.requires_grad)
+    num_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Model parameters: {num_params:,} ({num_trainable:,} trainable)")
 
     # Create optimizer
@@ -1814,6 +1894,7 @@ def main():
     writer = None
     if TENSORBOARD_AVAILABLE:
         from datetime import datetime
+
         run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_path = os.path.join(args.log_dir, run_name)
         writer = SummaryWriter(log_dir=log_path)
@@ -1857,15 +1938,13 @@ def main():
         # Log epoch metrics
         if writer is not None:
             writer.add_scalar("epoch/train_loss", train_metrics["loss"], epoch)
-            writer.add_scalar("epoch/train_recon_loss",
-                              train_metrics["recon_loss"], epoch)
-            writer.add_scalar("epoch/train_kl_loss",
-                              train_metrics["kl_loss"], epoch)
+            writer.add_scalar(
+                "epoch/train_recon_loss", train_metrics["recon_loss"], epoch
+            )
+            writer.add_scalar("epoch/train_kl_loss", train_metrics["kl_loss"], epoch)
             writer.add_scalar("epoch/val_loss", val_metrics["loss"], epoch)
-            writer.add_scalar("epoch/val_recon_loss",
-                              val_metrics["recon_loss"], epoch)
-            writer.add_scalar("epoch/val_kl_loss",
-                              val_metrics["kl_loss"], epoch)
+            writer.add_scalar("epoch/val_recon_loss", val_metrics["recon_loss"], epoch)
+            writer.add_scalar("epoch/val_kl_loss", val_metrics["kl_loss"], epoch)
 
         # Print progress
         print(
@@ -1902,15 +1981,15 @@ def main():
             # Save periodic checkpoint
             if (epoch + 1) % args.save_interval == 0:
                 save_path = os.path.join(
-                    args.checkpoint_dir, f"checkpoint_epoch_{epoch + 1}.pt")
+                    args.checkpoint_dir, f"checkpoint_epoch_{epoch + 1}.pt"
+                )
                 torch.save(checkpoint, save_path)
                 print(f"Saved checkpoint: {save_path}")
 
             # Save best checkpoint
             if val_metrics["loss"] < best_val_loss:
                 best_val_loss = val_metrics["loss"]
-                save_path = os.path.join(
-                    args.checkpoint_dir, "checkpoint_best.pt")
+                save_path = os.path.join(args.checkpoint_dir, "checkpoint_best.pt")
                 torch.save(checkpoint, save_path)
                 print(f"Saved best checkpoint: {save_path}")
 
