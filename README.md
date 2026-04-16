@@ -3,12 +3,13 @@
 # HistoVAE
 
 [![CI Status](https://github.com/sablecrestlabs/HistoVAE/actions/workflows/python.yml/badge.svg)](https://github.com/eosin-platform/eov/actions/workflows/ci.yml)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-sablecrestlabs%2Fhistovae-blue?logo=docker)](https://hub.docker.com/r/sablecrestlabs/histovae)
+[![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen)](#status)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](#requirements)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.0%2B-EE4C2C)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-13.0-76B900)](#run-with-docker-gpu)
 [![OpenSlide](https://img.shields.io/badge/WSI-OpenSlide-informational)](https://openslide.org/)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue)](#license)
-[![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen)](#status)
 
 Fast-converging convolutional **Variational Autoencoder (VAE)** for **whole-slide image (WSI)** `.tif`/`.svs` files.
 
