@@ -11,6 +11,7 @@ on:
 jobs:
   publish:
     name: Build And Push Image
+    if: ${{ github.event_name != 'push' || github.ref_type == 'tag' || !contains(github.event.head_commit.message || '', '/noci') }}
     runs-on: ubuntu-latest
 
     steps:

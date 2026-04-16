@@ -5,6 +5,7 @@
 [![CI Status](https://github.com/sablecrestlabs/HistoVAE/actions/workflows/python.yml/badge.svg)](https://github.com/eosin-platform/eov/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](#requirements)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.0%2B-EE4C2C)](https://pytorch.org/)
+[![CUDA](https://img.shields.io/badge/CUDA-13.0-76B900)](#run-with-docker-gpu)
 [![OpenSlide](https://img.shields.io/badge/WSI-OpenSlide-informational)](https://openslide.org/)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue)](#license)
 [![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen)](#status)
@@ -39,8 +40,16 @@ Implemented in [vae.py](vae.py):
 
 This repo includes a GPU-capable Docker image (Ubuntu base + CUDA-enabled PyTorch installed via pip). To use the GPU, you’ll need:
 
+The GitHub Docker publish workflow also pushes a prebuilt image to `sablecrestlabs/histovae:latest`, and tagged releases additionally publish `sablecrestlabs/histovae:<tag>`.
+
 - NVIDIA drivers installed on the host
 - Docker + NVIDIA Container Toolkit (so `--gpus all` works)
+
+### Pull
+
+```bash
+docker pull sablecrestlabs/histovae:latest
+```
 
 ### Build
 
