@@ -757,7 +757,8 @@ class VAE(nn.Module):
 
     def reparameterize(self, mu, logvar, training: bool = True):
         # Much tighter clamp
-        logvar = torch.clamp(logvar, min=-10.0, max=5.0)  # std in ~[0.0067, ~4.5]
+        # std in ~[0.0067, ~4.5]
+        logvar = torch.clamp(logvar, min=-10.0, max=5.0)
         mu = torch.clamp(mu, min=-10.0, max=10.0)
 
         if training:
@@ -766,7 +767,6 @@ class VAE(nn.Module):
             return mu + eps * std
         else:
             return mu
-
 
     def forward(
         self,
@@ -794,13 +794,13 @@ class VAE(nn.Module):
         """
         # Clamp input to valid range to prevent NaN propagation
         x = torch.clamp(x, min=-1.0, max=1.0)
-        
+
         # Encode
         mu, logvar = self.encode(x)
 
         # Reparameterize
         z = self.reparameterize(mu, logvar, training=self.training)
-        
+
         # Clamp z to prevent extreme values
         z = torch.clamp(z, min=-10.0, max=10.0)
 
@@ -1045,7 +1045,6 @@ def has_nonfinite_gradients(model: nn.Module) -> bool:
     return False
 
 
-
 def train_epoch(
     model: VAE,
     dataloader: DataLoader,
@@ -1127,9 +1126,11 @@ def train_epoch(
             if max_grad_norm is not None:
                 # Unscareparameterizele once before clipping (official pattern)
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), max_grad_norm)
 
-            scaler.step(optimizer)  # internally checks for NaN/Inf grads and skips update if needed
+            # internally checks for NaN/Inf grads and skips update if needed
+            scaler.step(optimizer)
             scaler.update()
         else:
             outputs = model(x, kl_weight=kl_weight, return_latent=True)
