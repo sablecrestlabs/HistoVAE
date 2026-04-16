@@ -27,7 +27,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 try:
-    from torch.amp import autocast, GradScaler  # new style
+    from torch.amp import GradScaler, autocast  # new style
     AMP_AVAILABLE = True
 except ImportError:
     AMP_AVAILABLE = False
@@ -41,8 +41,8 @@ except ImportError:
     SummaryWriter = None
 
 try:
-    from torchvision.utils import make_grid
     from torchvision import transforms
+    from torchvision.utils import make_grid
     TORCHVISION_AVAILABLE = True
 except ImportError:
     TORCHVISION_AVAILABLE = False
@@ -63,7 +63,6 @@ except ImportError:
     Image = None
 
 import glob
-
 
 # =============================================================================
 # Configuration
