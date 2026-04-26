@@ -7,3 +7,5 @@ runs
 runs_grid
 runs_*
 checkpoints_*
+onnxruntime_*.json
+tmp_onnx_*
