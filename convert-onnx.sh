@@ -5,7 +5,7 @@ source .venv/bin/activate
 
 MODE="${HISTOVAE_ONNX_MODE:-reconstruct}"
 ONNX_PATH="${HISTOVAE_ONNX_PATH:-pretrained/HistoVae_${MODE}.onnx}"
-BATCH_SIZE="${HISTOVAE_ONNX_BATCH_SIZE:-16}"
+BATCH_SIZE="${HISTOVAE_ONNX_BATCH_SIZE:-32}"
 DYNAMIC_BATCH="${HISTOVAE_ONNX_DYNAMIC_BATCH:-0}"
 
 create_args=(
