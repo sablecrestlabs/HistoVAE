@@ -194,7 +194,8 @@ class ResidualBlock(tf.keras.layers.Layer):
         self.norm2 = get_norm_layer(out_channels, norm_type, norm_num_groups)
         self.act2 = get_activation(activation)
         self.dropout = (
-            tf.keras.layers.Dropout(dropout) if dropout > 0 else tf.keras.layers.Identity()
+            tf.keras.layers.Dropout(
+                dropout) if dropout > 0 else tf.keras.layers.Identity()
         )
         self.conv2 = tf.keras.layers.Conv2D(out_channels, 3, padding="same")
 
@@ -506,7 +507,8 @@ class Encoder(tf.keras.Model):
         final_ch = base_channels * channel_multipliers[-1]
         self.norm_out = get_norm_layer(final_ch, norm_type, norm_num_groups)
         self.act_out = get_activation(activation)
-        self.conv_out = tf.keras.layers.Conv2D(2 * latent_channels, 3, padding="same")
+        self.conv_out = tf.keras.layers.Conv2D(
+            2 * latent_channels, 3, padding="same")
 
     def call(self, x: tf.Tensor, training: bool = False) -> Tuple[tf.Tensor, tf.Tensor]:
         h = self.conv_in(x)
@@ -553,7 +555,8 @@ class Decoder(tf.keras.Model):
             out_ch = base_channels * mult
             next_channels = None
             if index < len(channel_multipliers_rev) - 1:
-                next_channels = base_channels * channel_multipliers_rev[index + 1]
+                next_channels = base_channels * \
+                    channel_multipliers_rev[index + 1]
             self.stages.append(
                 DecoderStage(
                     in_channels=in_ch,
@@ -688,7 +691,8 @@ class VAE(tf.keras.Model):
         x_recon = self.decode(z, training=training)
         x_recon = tf.clip_by_value(x_recon, -1.0, 1.0)
 
-        recon_loss = reconstruction_loss(x, x_recon, loss_type=self.recon_loss_type)
+        recon_loss = reconstruction_loss(
+            x, x_recon, loss_type=self.recon_loss_type)
         kl_loss = kl_divergence(mu, logvar)
         recon_loss = tf.clip_by_value(recon_loss, 0.0, 100.0)
         kl_loss = tf.clip_by_value(kl_loss, 0.0, 1000.0)
@@ -829,14 +833,40 @@ def log_images(
     prefix: str = "train",
     num_images: int = 4,
 ) -> None:
-    x = tf.cast(tf.clip_by_value((x[:num_images] + 1.0) / 2.0, 0.0, 1.0), tf.float32)
+    x = tf.cast(tf.clip_by_value(
+        (x[:num_images] + 1.0) / 2.0, 0.0, 1.0), tf.float32)
     x_recon = tf.cast(
         tf.clip_by_value((x_recon[:num_images] + 1.0) / 2.0, 0.0, 1.0),
         tf.float32,
     )
     combined = tf.concat([x, x_recon], axis=2)
     with writer.as_default():
-        tf.summary.image(f"{prefix}/orig_vs_recon", combined, step=step, max_outputs=num_images)
+        tf.summary.image(f"{prefix}/orig_vs_recon", combined,
+                         step=step, max_outputs=num_images)
+
+
+@tf.function(reduce_retracing=True)
+def run_train_step(
+    model: VAE,
+    x: tf.Tensor,
+    kl_weight: tf.Tensor,
+) -> Tuple[Dict[str, tf.Tensor], tf.Tensor, Any]:
+    with tf.GradientTape() as tape:
+        outputs = model(x, kl_weight=kl_weight,
+                        return_latent=True, training=True)
+        loss = tf.cast(outputs["loss"], tf.float32)
+
+    gradients = tape.gradient(loss, model.trainable_variables)
+    return outputs, loss, gradients
+
+
+@tf.function(reduce_retracing=True)
+def run_eval_step(
+    model: VAE,
+    x: tf.Tensor,
+    kl_weight: tf.Tensor,
+) -> Dict[str, tf.Tensor]:
+    return model(x, kl_weight=kl_weight, return_latent=False, training=False)
 
 
 def train_epoch(
@@ -863,15 +893,15 @@ def train_epoch(
             print(f"Skipping batch {batch_idx} due to NaN/Inf in input data")
             continue
 
-        with tf.GradientTape() as tape:
-            outputs = model(x, kl_weight=kl_weight, return_latent=True, training=True)
-            loss = tf.cast(outputs["loss"], tf.float32)
+        outputs, loss, gradients = run_train_step(
+            model,
+            x,
+            tf.convert_to_tensor(kl_weight, dtype=tf.float32),
+        )
 
         if check_for_nan(loss, "loss"):
             print(f"Skipping batch {batch_idx} due to NaN loss")
             continue
-
-        gradients = tape.gradient(loss, model.trainable_variables)
 
         grad_var_pairs = [
             (grad, variable)
@@ -907,14 +937,19 @@ def train_epoch(
         if writer is not None and global_step % log_interval == 0:
             with writer.as_default():
                 tf.summary.scalar("train/loss", loss_value, step=global_step)
-                tf.summary.scalar("train/recon_loss", recon_value, step=global_step)
+                tf.summary.scalar("train/recon_loss",
+                                  recon_value, step=global_step)
                 tf.summary.scalar("train/kl_loss", kl_value, step=global_step)
-                tf.summary.scalar("train/kl_weight", kl_weight, step=global_step)
-                tf.summary.histogram("train/mu", outputs["mu"], step=global_step)
-                tf.summary.histogram("train/logvar", outputs["logvar"], step=global_step)
+                tf.summary.scalar("train/kl_weight",
+                                  kl_weight, step=global_step)
+                tf.summary.histogram(
+                    "train/mu", outputs["mu"], step=global_step)
+                tf.summary.histogram(
+                    "train/logvar", outputs["logvar"], step=global_step)
 
         if writer is not None and global_step % image_log_interval == 0:
-            log_images(writer, x, outputs["x_recon"], global_step, prefix="train")
+            log_images(writer, x, outputs["x_recon"],
+                       global_step, prefix="train")
 
         global_step += 1
 
@@ -941,9 +976,14 @@ def evaluate(
         if max_batches is not None and batch_idx >= max_batches:
             break
 
-        outputs = model(x, kl_weight=kl_weight, return_latent=False, training=False)
+        outputs = run_eval_step(
+            model,
+            x,
+            tf.convert_to_tensor(kl_weight, dtype=tf.float32),
+        )
         total_loss += float(tf.cast(outputs["loss"], tf.float32).numpy())
-        total_recon_loss += float(tf.cast(outputs["recon_loss"], tf.float32).numpy())
+        total_recon_loss += float(
+            tf.cast(outputs["recon_loss"], tf.float32).numpy())
         total_kl_loss += float(tf.cast(outputs["kl_loss"], tf.float32).numpy())
         num_batches += 1
 
@@ -986,13 +1026,15 @@ class OpenSlideTileDataset:
         level: int = 0,
         color_jitter: bool = False,
         color_jitter_strength: float = 0.05,
+        seed: Optional[int] = None,
     ):
         if not OPENSLIDE_AVAILABLE:
             raise ImportError(
                 "openslide-python is required. Install with: pip install openslide-python"
             )
         if not PIL_AVAILABLE:
-            raise ImportError("Pillow is required. Install with: pip install Pillow")
+            raise ImportError(
+                "Pillow is required. Install with: pip install Pillow")
 
         self.data_root = data_root
         self.tile_size = tile_size
@@ -1000,15 +1042,21 @@ class OpenSlideTileDataset:
         self.level = level
         self.color_jitter = color_jitter
         self.color_jitter_strength = color_jitter_strength
+        self.seed = seed
+        self._rng = random.Random(seed)
 
         self.tif_files = glob.glob(os.path.join(data_root, "*.tif"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.TIF"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.svs"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.SVS"))
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.tif"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.TIF"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.svs"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.SVS"), recursive=True)
+        self.tif_files += glob.glob(os.path.join(data_root,
+                                    "**", "*.tif"), recursive=True)
+        self.tif_files += glob.glob(os.path.join(data_root,
+                                    "**", "*.TIF"), recursive=True)
+        self.tif_files += glob.glob(os.path.join(data_root,
+                                    "**", "*.svs"), recursive=True)
+        self.tif_files += glob.glob(os.path.join(data_root,
+                                    "**", "*.SVS"), recursive=True)
         self.tif_files = list(set(self.tif_files))
 
         if not self.tif_files:
@@ -1018,6 +1066,18 @@ class OpenSlideTileDataset:
         self._slide_cache: Dict[str, Any] = {}
         self._slide_dimensions: Dict[str, Tuple[int, int]] = {}
         self._invalid_slides = set()
+
+    def clone(self, seed_offset: int = 0) -> "OpenSlideTileDataset":
+        clone_seed = None if self.seed is None else self.seed + seed_offset + 1
+        return OpenSlideTileDataset(
+            data_root=self.data_root,
+            tile_size=self.tile_size,
+            tiles_per_epoch=self.tiles_per_epoch,
+            level=self.level,
+            color_jitter=self.color_jitter,
+            color_jitter_strength=self.color_jitter_strength,
+            seed=clone_seed,
+        )
 
     def _get_slide_with_dims(
         self, tif_path: str
@@ -1056,7 +1116,7 @@ class OpenSlideTileDataset:
         open_error_count = 0
 
         for _ in range(max_attempts):
-            tif_path = random.choice(self.tif_files)
+            tif_path = self._rng.choice(self.tif_files)
             result = self._get_slide_with_dims(tif_path)
             if result is None:
                 open_error_count += 1
@@ -1073,8 +1133,8 @@ class OpenSlideTileDataset:
                 )
                 continue
 
-            x_coord = random.randint(0, max_x)
-            y_coord = random.randint(0, max_y)
+            x_coord = self._rng.randint(0, max_x)
+            y_coord = self._rng.randint(0, max_y)
 
             try:
                 level = min(self.level, slide.level_count - 1)
@@ -1094,7 +1154,8 @@ class OpenSlideTileDataset:
 
                 arr = np.array(img)
                 near_black_mask = (
-                    (arr[:, :, 0] < 4) & (arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
+                    (arr[:, :, 0] < 4) & (
+                        arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
                 )
                 arr[near_black_mask] = [255, 255, 255]
                 img = Image.fromarray(arr)
@@ -1124,9 +1185,9 @@ class OpenSlideTileDataset:
             return img
 
         strength = self.color_jitter_strength
-        brightness = random.uniform(1.0 - strength, 1.0 + strength)
-        contrast = random.uniform(1.0 - strength, 1.0 + strength)
-        saturation = random.uniform(1.0 - strength, 1.0 + strength)
+        brightness = self._rng.uniform(1.0 - strength, 1.0 + strength)
+        contrast = self._rng.uniform(1.0 - strength, 1.0 + strength)
+        saturation = self._rng.uniform(1.0 - strength, 1.0 + strength)
 
         img = ImageEnhance.Brightness(img).enhance(brightness)
         img = ImageEnhance.Contrast(img).enhance(contrast)
@@ -1141,12 +1202,12 @@ class OpenSlideTileDataset:
             flip_h = Image.FLIP_LEFT_RIGHT
             flip_v = Image.FLIP_TOP_BOTTOM
 
-        if random.random() > 0.5:
+        if self._rng.random() > 0.5:
             img = img.transpose(flip_h)
-        if random.random() > 0.5:
+        if self._rng.random() > 0.5:
             img = img.transpose(flip_v)
 
-        rotations = random.randint(0, 3)
+        rotations = self._rng.randint(0, 3)
         if rotations > 0:
             img = img.rotate(rotations * 90, expand=False)
 
@@ -1205,14 +1266,46 @@ def create_dataset(
     output_signature = tf.TensorSpec(
         shape=(img_size, img_size, img_channels), dtype=tf.float32
     )
-    tf_dataset = tf.data.Dataset.from_generator(dataset.generator, output_signature=output_signature)
+    host_cpu_count = max(1, os.cpu_count() or 1)
+    # TensorFlow's Python-backed OpenSlide pipeline benefits from more host threads
+    # than the PyTorch DataLoader worker count it is mirroring.
+    loader_thread_count = max(num_workers, min(
+        host_cpu_count, num_workers * 2))
+    worker_count = max(1, min(loader_thread_count, len(dataset)))
+
+    def worker_generator(worker_index: np.integer) -> Generator[np.ndarray, None, None]:
+        worker_dataset = dataset.clone(seed_offset=int(worker_index))
+        yield from worker_dataset.generator()
+
+    if worker_count == 1:
+        tf_dataset = tf.data.Dataset.from_generator(
+            dataset.generator,
+            output_signature=output_signature,
+        )
+    else:
+        worker_ids = tf.data.Dataset.range(worker_count)
+        tf_dataset = worker_ids.interleave(
+            lambda worker_id: tf.data.Dataset.from_generator(
+                worker_generator,
+                args=(worker_id,),
+                output_signature=output_signature,
+            ),
+            cycle_length=worker_count,
+            block_length=1,
+            num_parallel_calls=tf.data.AUTOTUNE,
+            deterministic=not shuffle,
+        ).take(len(dataset))
+
     if shuffle:
-        tf_dataset = tf_dataset.shuffle(min(len(dataset), max(batch_size * 16, 256)))
+        tf_dataset = tf_dataset.shuffle(
+            min(len(dataset), max(batch_size * 16, 256)))
+
     tf_dataset = tf_dataset.batch(batch_size, drop_remainder=drop_remainder)
     options = tf.data.Options()
-    options.threading.private_threadpool_size = max(1, num_workers)
+    options.threading.private_threadpool_size = loader_thread_count
+    options.deterministic = not shuffle
     tf_dataset = tf_dataset.with_options(options)
-    return tf_dataset.prefetch(tf.data.AUTOTUNE)
+    return tf_dataset.prefetch(max(2 * batch_size, worker_count))
 
 
 # =============================================================================
@@ -1221,39 +1314,64 @@ def create_dataset(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train VAE on image data with TensorFlow")
+    parser = argparse.ArgumentParser(
+        description="Train VAE on image data with TensorFlow")
 
-    parser.add_argument("--data-root", type=str, required=True, help="Directory containing .tif/.svs files")
-    parser.add_argument("--img-size", type=int, default=256, help="Image/tile size (default: 256)")
-    parser.add_argument("--img-channels", type=int, default=3, help="Number of image channels")
+    parser.add_argument("--data-root", type=str, required=True,
+                        help="Directory containing .tif/.svs files")
+    parser.add_argument("--img-size", type=int, default=256,
+                        help="Image/tile size (default: 256)")
+    parser.add_argument("--img-channels", type=int,
+                        default=3, help="Number of image channels")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
-    parser.add_argument("--num-workers", type=int, default=12, help="Dataset worker thread count")
-    parser.add_argument("--tiles-per-epoch", type=int, default=10000, help="Number of tiles per epoch")
-    parser.add_argument("--level", type=int, default=0, help="OpenSlide pyramid level (0=highest resolution)")
+    parser.add_argument("--num-workers", type=int, default=12,
+                        help="Dataset worker thread count")
+    parser.add_argument("--tiles-per-epoch", type=int,
+                        default=10000, help="Number of tiles per epoch")
+    parser.add_argument("--level", type=int, default=0,
+                        help="OpenSlide pyramid level (0=highest resolution)")
 
-    parser.add_argument("--base-channels", type=int, default=32, help="Base channel count (default: 32 for ~8M params)")
-    parser.add_argument("--latent-channels", type=int, default=32, help="Number of latent channels")
-    parser.add_argument("--channel-multipliers", type=str, default="1,2,4", help="Channel multipliers (comma-separated)")
-    parser.add_argument("--num-res-blocks", type=int, default=2, help="Residual blocks per stage")
-    parser.add_argument("--use-attention-at", type=str, default="32", help="Spatial sizes for attention (comma-separated)")
+    parser.add_argument("--base-channels", type=int, default=32,
+                        help="Base channel count (default: 32 for ~8M params)")
+    parser.add_argument("--latent-channels", type=int,
+                        default=32, help="Number of latent channels")
+    parser.add_argument("--channel-multipliers", type=str,
+                        default="1,2,4", help="Channel multipliers (comma-separated)")
+    parser.add_argument("--num-res-blocks", type=int,
+                        default=2, help="Residual blocks per stage")
+    parser.add_argument("--use-attention-at", type=str, default="32",
+                        help="Spatial sizes for attention (comma-separated)")
 
-    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
+    parser.add_argument("--epochs", type=int, default=100,
+                        help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--weight-decay", type=float, default=0.01, help="Weight decay")
-    parser.add_argument("--beta", type=float, default=0.3, help="Maximum KL weight (beta-VAE)")
-    parser.add_argument("--kl-warmup-steps", type=int, default=8000, help="Steps for KL warmup")
-    parser.add_argument("--max-grad-norm", type=float, default=1.0, help="Max gradient norm (0 to disable)")
-    parser.add_argument("--recon-loss-type", type=str, default="l1", choices=["l1", "l2"], help="Reconstruction loss type")
+    parser.add_argument("--weight-decay", type=float,
+                        default=0.01, help="Weight decay")
+    parser.add_argument("--beta", type=float, default=0.3,
+                        help="Maximum KL weight (beta-VAE)")
+    parser.add_argument("--kl-warmup-steps", type=int,
+                        default=8000, help="Steps for KL warmup")
+    parser.add_argument("--max-grad-norm", type=float,
+                        default=1.0, help="Max gradient norm (0 to disable)")
+    parser.add_argument("--recon-loss-type", type=str, default="l1",
+                        choices=["l1", "l2"], help="Reconstruction loss type")
 
-    parser.add_argument("--use-amp", action="store_true", default=True, help="Use mixed precision training")
-    parser.add_argument("--no-amp", action="store_false", dest="use_amp", help="Disable mixed precision training")
+    parser.add_argument("--use-amp", action="store_true",
+                        default=True, help="Use mixed precision training")
+    parser.add_argument("--no-amp", action="store_false",
+                        dest="use_amp", help="Disable mixed precision training")
 
-    parser.add_argument("--log-dir", type=str, default="runs_vae_tf", help="TensorBoard log directory")
-    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints_vae_tf", help="Checkpoint directory")
-    parser.add_argument("--log-interval", type=int, default=100, help="Steps between scalar logging")
-    parser.add_argument("--save-interval", type=int, default=5, help="Epochs between checkpoints")
+    parser.add_argument("--log-dir", type=str,
+                        default="runs_vae_tf", help="TensorBoard log directory")
+    parser.add_argument("--checkpoint-dir", type=str,
+                        default="checkpoints_vae_tf", help="Checkpoint directory")
+    parser.add_argument("--log-interval", type=int,
+                        default=100, help="Steps between scalar logging")
+    parser.add_argument("--save-interval", type=int,
+                        default=5, help="Epochs between checkpoints")
 
-    parser.add_argument("--device", type=str, default="cuda", help="Device to use (cuda or cpu)")
+    parser.add_argument("--device", type=str, default="cuda",
+                        help="Device to use (cuda or cpu)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     return parser.parse_args()
 
@@ -1316,8 +1434,10 @@ def main() -> None:
     if use_gpu:
         print(f"GPUs detected: {len(tf.config.list_physical_devices('GPU'))}")
 
-    channel_multipliers = tuple(int(x) for x in args.channel_multipliers.split(",") if x)
-    use_attention_at = tuple(int(x) for x in args.use_attention_at.split(",") if x)
+    channel_multipliers = tuple(int(x)
+                                for x in args.channel_multipliers.split(",") if x)
+    use_attention_at = tuple(int(x)
+                             for x in args.use_attention_at.split(",") if x)
 
     config = VAEConfig(
         img_channels=args.img_channels,
@@ -1343,8 +1463,10 @@ def main() -> None:
         mixed_precision.set_global_policy("float32")
 
     print("\nVAE Configuration:")
-    print(f"  Image size: {config.img_size}x{config.img_size}x{config.img_channels}")
-    print(f"  Latent size: {config.latent_size}x{config.latent_size}x{config.latent_channels}")
+    print(
+        f"  Image size: {config.img_size}x{config.img_size}x{config.img_channels}")
+    print(
+        f"  Latent size: {config.latent_size}x{config.latent_size}x{config.latent_channels}")
     print(f"  Base channels: {config.base_channels}")
     print(f"  Channel multipliers: {config.channel_multipliers}")
     print(f"  Attention at: {config.use_attention_at}")
@@ -1361,7 +1483,8 @@ def main() -> None:
     model(dummy_input, training=False)
 
     num_params = int(np.sum([np.prod(var.shape) for var in model.variables]))
-    num_trainable = int(np.sum([np.prod(var.shape) for var in model.trainable_variables]))
+    num_trainable = int(np.sum([np.prod(var.shape)
+                        for var in model.trainable_variables]))
     print(f"Model parameters: {num_params:,} ({num_trainable:,} trainable)")
 
     optimizer = tf.keras.optimizers.AdamW(
@@ -1370,7 +1493,8 @@ def main() -> None:
         beta_2=config.betas[1],
         weight_decay=config.weight_decay,
     )
-    kl_scheduler = CyclicKLScheduler(beta=config.beta, cycle_steps=config.kl_warmup_steps, ratio=0.5)
+    kl_scheduler = CyclicKLScheduler(
+        beta=config.beta, cycle_steps=config.kl_warmup_steps, ratio=0.5)
 
     print(f"\nCreating dataset from TIF files in: {args.data_root}")
     train_dataset_obj = OpenSlideTileDataset(
@@ -1380,6 +1504,7 @@ def main() -> None:
         level=args.level,
         color_jitter=True,
         color_jitter_strength=0.05,
+        seed=args.seed,
     )
     val_dataset_obj = OpenSlideTileDataset(
         data_root=args.data_root,
@@ -1387,6 +1512,7 @@ def main() -> None:
         tiles_per_epoch=max(1, args.tiles_per_epoch // 10),
         level=args.level,
         color_jitter=False,
+        seed=args.seed + 1,
     )
 
     train_dataset = create_dataset(
@@ -1455,15 +1581,22 @@ def main() -> None:
         )
 
         current_kl_weight = kl_scheduler(global_step)
-        val_metrics = evaluate(model=model, dataset=val_dataset, kl_weight=current_kl_weight)
+        val_metrics = evaluate(
+            model=model, dataset=val_dataset, kl_weight=current_kl_weight)
 
         with writer.as_default():
-            tf.summary.scalar("epoch/train_loss", train_metrics["loss"], step=epoch)
-            tf.summary.scalar("epoch/train_recon_loss", train_metrics["recon_loss"], step=epoch)
-            tf.summary.scalar("epoch/train_kl_loss", train_metrics["kl_loss"], step=epoch)
-            tf.summary.scalar("epoch/val_loss", val_metrics["loss"], step=epoch)
-            tf.summary.scalar("epoch/val_recon_loss", val_metrics["recon_loss"], step=epoch)
-            tf.summary.scalar("epoch/val_kl_loss", val_metrics["kl_loss"], step=epoch)
+            tf.summary.scalar("epoch/train_loss",
+                              train_metrics["loss"], step=epoch)
+            tf.summary.scalar("epoch/train_recon_loss",
+                              train_metrics["recon_loss"], step=epoch)
+            tf.summary.scalar("epoch/train_kl_loss",
+                              train_metrics["kl_loss"], step=epoch)
+            tf.summary.scalar("epoch/val_loss",
+                              val_metrics["loss"], step=epoch)
+            tf.summary.scalar("epoch/val_recon_loss",
+                              val_metrics["recon_loss"], step=epoch)
+            tf.summary.scalar("epoch/val_kl_loss",
+                              val_metrics["kl_loss"], step=epoch)
 
         print(
             f"Epoch {epoch + 1}/{args.epochs} | "

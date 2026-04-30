@@ -199,13 +199,15 @@ class ResidualBlock(nn.Module):
         # First norm + conv
         self.norm1 = get_norm_layer(in_channels, norm_type, norm_num_groups)
         self.act1 = get_activation(activation)
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, out_channels,
+                               kernel_size=3, padding=1)
 
         # Second norm + conv
         self.norm2 = get_norm_layer(out_channels, norm_type, norm_num_groups)
         self.act2 = get_activation(activation)
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels,
+                               kernel_size=3, padding=1)
 
         # Skip connection (1x1 conv if channels differ)
         if in_channels != out_channels:
@@ -301,7 +303,8 @@ class Downsample(nn.Module):
 
     def __init__(self, channels: int):
         super().__init__()
-        self.conv = nn.Conv2d(channels, channels, kernel_size=3, stride=2, padding=1)
+        self.conv = nn.Conv2d(channels, channels,
+                              kernel_size=3, stride=2, padding=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(x)
@@ -369,7 +372,8 @@ class Encoder(nn.Module):
         self.use_attention_at = set(use_attention_at)
 
         # Initial convolution
-        self.conv_in = nn.Conv2d(in_channels, base_channels, kernel_size=3, padding=1)
+        self.conv_in = nn.Conv2d(
+            in_channels, base_channels, kernel_size=3, padding=1)
 
         # Downsampling stages
         self.stages = nn.ModuleList()
@@ -540,7 +544,8 @@ class Decoder(nn.Module):
 
         # Initial conv from latent
         first_ch = base_channels * channel_multipliers_rev[0]
-        self.conv_in = nn.Conv2d(latent_channels, first_ch, kernel_size=3, padding=1)
+        self.conv_in = nn.Conv2d(
+            latent_channels, first_ch, kernel_size=3, padding=1)
 
         # Store for later
         self._channel_multipliers_rev = channel_multipliers_rev
@@ -594,7 +599,8 @@ class Decoder(nn.Module):
         final_ch = base_channels * channel_multipliers_rev[-1]
         self.norm_out = get_norm_layer(final_ch, norm_type, norm_num_groups)
         self.act_out = get_activation(activation)
-        self.conv_out = nn.Conv2d(final_ch, out_channels, kernel_size=3, padding=1)
+        self.conv_out = nn.Conv2d(
+            final_ch, out_channels, kernel_size=3, padding=1)
 
         # Create attention modules
         self._create_attention_modules()
@@ -825,7 +831,8 @@ class VAE(nn.Module):
         x_recon = torch.clamp(x_recon, min=-1.0, max=1.0)
 
         # Compute losses
-        recon_loss = reconstruction_loss(x, x_recon, loss_type=self.recon_loss_type)
+        recon_loss = reconstruction_loss(
+            x, x_recon, loss_type=self.recon_loss_type)
         kl_loss = kl_divergence(mu, logvar)
 
         # Clamp individual losses to prevent extreme values
@@ -1142,7 +1149,8 @@ def train_epoch(
             if max_grad_norm is not None:
                 # Unscareparameterizele once before clipping (official pattern)
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), max_grad_norm)
 
             # internally checks for NaN/Inf grads and skips update if needed
             scaler.step(optimizer)
@@ -1159,13 +1167,15 @@ def train_epoch(
             loss.backward()
 
             if has_nonfinite_gradients(model):
-                print(f"Skipping batch {batch_idx} due to non-finite gradients")
+                print(
+                    f"Skipping batch {batch_idx} due to non-finite gradients")
                 optimizer.zero_grad(set_to_none=True)
                 continue
 
             # Gradient clipping
             if max_grad_norm is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), max_grad_norm)
 
             optimizer.step()
 
@@ -1181,18 +1191,21 @@ def train_epoch(
             writer.add_scalar(
                 "train/recon_loss", outputs["recon_loss"].item(), global_step
             )
-            writer.add_scalar("train/kl_loss", outputs["kl_loss"].item(), global_step)
+            writer.add_scalar(
+                "train/kl_loss", outputs["kl_loss"].item(), global_step)
             writer.add_scalar("train/kl_weight", kl_weight, global_step)
             # Log mu and logvar histograms for diagnosing posterior collapse
             if "mu" in outputs and "logvar" in outputs:
-                writer.add_histogram("train/mu", outputs["mu"].detach(), global_step)
+                writer.add_histogram(
+                    "train/mu", outputs["mu"].detach(), global_step)
                 writer.add_histogram(
                     "train/logvar", outputs["logvar"].detach(), global_step
                 )
 
         # Image logging
         if writer is not None and global_step % image_log_interval == 0:
-            log_images(writer, x, outputs["x_recon"], global_step, prefix="train")
+            log_images(writer, x, outputs["x_recon"],
+                       global_step, prefix="train")
 
         global_step += 1
 
@@ -1527,7 +1540,8 @@ class OpenSlideTileDataset(Dataset):
                 # Some TIF backgrounds render as black (0,0,0) rather than transparent
                 arr = np.array(img)
                 near_black_mask = (
-                    (arr[:, :, 0] < 4) & (arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
+                    (arr[:, :, 0] < 4) & (
+                        arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
                 )
                 arr[near_black_mask] = [255, 255, 255]
                 img = Image.fromarray(arr)
@@ -1701,7 +1715,8 @@ def parse_args() -> argparse.Namespace:
         "--epochs", type=int, default=100, help="Number of training epochs"
     )
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--weight-decay", type=float, default=0.01, help="Weight decay")
+    parser.add_argument("--weight-decay", type=float,
+                        default=0.01, help="Weight decay")
     parser.add_argument(
         "--beta", type=float, default=0.3, help="Maximum KL weight (beta-VAE)"
     )
@@ -1754,7 +1769,8 @@ def parse_args() -> argparse.Namespace:
     )
 
     # Device
-    parser.add_argument("--device", type=str, default="cuda", help="Device to use")
+    parser.add_argument("--device", type=str,
+                        default="cuda", help="Device to use")
 
     # Reproducibility
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -1784,7 +1800,8 @@ def main():
         )
 
     # Parse channel multipliers and attention resolutions
-    channel_multipliers = tuple(int(x) for x in args.channel_multipliers.split(","))
+    channel_multipliers = tuple(int(x)
+                                for x in args.channel_multipliers.split(","))
     use_attention_at = tuple(int(x) for x in args.use_attention_at.split(","))
 
     # Create config
@@ -1807,7 +1824,8 @@ def main():
     config.validate()
 
     print(f"\nVAE Configuration:")
-    print(f"  Image size: {config.img_size}x{config.img_size}x{config.img_channels}")
+    print(
+        f"  Image size: {config.img_size}x{config.img_size}x{config.img_channels}")
     print(
         f"  Latent size: {config.latent_size}x{config.latent_size}x{config.latent_channels}"
     )
@@ -1825,7 +1843,8 @@ def main():
 
     # Count parameters
     num_params = sum(p.numel() for p in model.parameters())
-    num_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    num_trainable = sum(p.numel()
+                        for p in model.parameters() if p.requires_grad)
     print(f"Model parameters: {num_params:,} ({num_trainable:,} trainable)")
 
     # Create optimizer
@@ -1941,10 +1960,13 @@ def main():
             writer.add_scalar(
                 "epoch/train_recon_loss", train_metrics["recon_loss"], epoch
             )
-            writer.add_scalar("epoch/train_kl_loss", train_metrics["kl_loss"], epoch)
+            writer.add_scalar("epoch/train_kl_loss",
+                              train_metrics["kl_loss"], epoch)
             writer.add_scalar("epoch/val_loss", val_metrics["loss"], epoch)
-            writer.add_scalar("epoch/val_recon_loss", val_metrics["recon_loss"], epoch)
-            writer.add_scalar("epoch/val_kl_loss", val_metrics["kl_loss"], epoch)
+            writer.add_scalar("epoch/val_recon_loss",
+                              val_metrics["recon_loss"], epoch)
+            writer.add_scalar("epoch/val_kl_loss",
+                              val_metrics["kl_loss"], epoch)
 
         # Print progress
         print(
@@ -1989,7 +2011,8 @@ def main():
             # Save best checkpoint
             if val_metrics["loss"] < best_val_loss:
                 best_val_loss = val_metrics["loss"]
-                save_path = os.path.join(args.checkpoint_dir, "checkpoint_best.pt")
+                save_path = os.path.join(
+                    args.checkpoint_dir, "checkpoint_best.pt")
                 torch.save(checkpoint, save_path)
                 print(f"Saved best checkpoint: {save_path}")
 

@@ -167,7 +167,8 @@ def main() -> None:
         if provider in available_providers
     ]
     if not requested_providers:
-        raise RuntimeError("No supported ONNX Runtime execution providers are available")
+        raise RuntimeError(
+            "No supported ONNX Runtime execution providers are available")
 
     print("Requested providers: " + ", ".join(requested_providers))
     if "CUDAExecutionProvider" not in requested_providers:
@@ -191,7 +192,8 @@ def main() -> None:
     profile_path = session.end_profiling()
 
     summarize_profile(profile_path)
-    print_provider_conclusion(available_providers, requested_providers, profile_path)
+    print_provider_conclusion(
+        available_providers, requested_providers, profile_path)
 
 
 if __name__ == "__main__":
