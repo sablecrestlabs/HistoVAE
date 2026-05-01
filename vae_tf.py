@@ -107,6 +107,60 @@ class VAEConfig:
 # =============================================================================
 
 
+class TorchConvKernelInitializer(tf.keras.initializers.Initializer):
+    """Match PyTorch Conv2d default kaiming_uniform_(a=sqrt(5))."""
+
+    def __call__(
+        self,
+        shape: Tuple[int, ...],
+        dtype: Optional[tf.dtypes.DType] = None,
+    ) -> tf.Tensor:
+        dtype = dtype or tf.float32
+        fan_in = np.prod(shape[:-1])
+        bound = 1.0 / math.sqrt(float(fan_in))
+        return tf.random.uniform(shape, minval=-bound, maxval=bound, dtype=dtype)
+
+    def get_config(self) -> Dict[str, Any]:
+        return {}
+
+
+class TorchConvBiasInitializer(tf.keras.initializers.Initializer):
+    """Match PyTorch Conv2d default bias init derived from fan_in."""
+
+    def __init__(self, kernel_size: int):
+        self.kernel_size = kernel_size
+
+    def __call__(
+        self,
+        shape: Tuple[int, ...],
+        dtype: Optional[tf.dtypes.DType] = None,
+    ) -> tf.Tensor:
+        dtype = dtype or tf.float32
+        fan_in = self.kernel_size * self.kernel_size * int(shape[0])
+        bound = 1.0 / math.sqrt(float(fan_in))
+        return tf.random.uniform(shape, minval=-bound, maxval=bound, dtype=dtype)
+
+    def get_config(self) -> Dict[str, Any]:
+        return {"kernel_size": self.kernel_size}
+
+
+def make_conv2d(
+    filters: int,
+    kernel_size: int,
+    strides: int = 1,
+    padding: str = "same",
+) -> tf.keras.layers.Conv2D:
+    return tf.keras.layers.Conv2D(
+        filters,
+        kernel_size,
+        strides=strides,
+        padding=padding,
+        use_bias=True,
+        kernel_initializer=TorchConvKernelInitializer(),
+        bias_initializer=TorchConvBiasInitializer(kernel_size),
+    )
+
+
 class GroupNorm(tf.keras.layers.Layer):
     """Simple GroupNorm implementation for NHWC tensors."""
 
@@ -189,7 +243,7 @@ class ResidualBlock(tf.keras.layers.Layer):
         self.out_channels = out_channels
         self.norm1 = get_norm_layer(in_channels, norm_type, norm_num_groups)
         self.act1 = get_activation(activation)
-        self.conv1 = tf.keras.layers.Conv2D(out_channels, 3, padding="same")
+        self.conv1 = make_conv2d(out_channels, 3, padding="same")
 
         self.norm2 = get_norm_layer(out_channels, norm_type, norm_num_groups)
         self.act2 = get_activation(activation)
@@ -197,10 +251,10 @@ class ResidualBlock(tf.keras.layers.Layer):
             tf.keras.layers.Dropout(
                 dropout) if dropout > 0 else tf.keras.layers.Identity()
         )
-        self.conv2 = tf.keras.layers.Conv2D(out_channels, 3, padding="same")
+        self.conv2 = make_conv2d(out_channels, 3, padding="same")
 
         if in_channels != out_channels:
-            self.skip = tf.keras.layers.Conv2D(out_channels, 1, padding="same")
+            self.skip = make_conv2d(out_channels, 1, padding="same")
         else:
             self.skip = tf.keras.layers.Identity()
 
@@ -247,8 +301,8 @@ class SelfAttention2d(tf.keras.layers.Layer):
         self.head_dim = channels // num_heads
         self.scale = self.head_dim**-0.5
         self.norm = get_norm_layer(channels, norm_type, norm_num_groups)
-        self.qkv = tf.keras.layers.Conv2D(channels * 3, 1, padding="same")
-        self.proj = tf.keras.layers.Conv2D(channels, 1, padding="same")
+        self.qkv = make_conv2d(channels * 3, 1, padding="same")
+        self.proj = make_conv2d(channels, 1, padding="same")
 
     def build(self, input_shape: tf.TensorShape) -> None:
         current_shape = tf.TensorShape(input_shape)
@@ -287,9 +341,7 @@ class SelfAttention2d(tf.keras.layers.Layer):
 class Downsample(tf.keras.layers.Layer):
     def __init__(self, channels: int):
         super().__init__()
-        self.conv = tf.keras.layers.Conv2D(
-            channels, 3, strides=2, padding="same"
-        )
+        self.conv = make_conv2d(channels, 3, strides=2, padding="same")
 
     def build(self, input_shape: tf.TensorShape) -> None:
         self.conv.build(input_shape)
@@ -302,7 +354,7 @@ class Downsample(tf.keras.layers.Layer):
 class Upsample(tf.keras.layers.Layer):
     def __init__(self, channels: int):
         super().__init__()
-        self.conv = tf.keras.layers.Conv2D(channels, 3, padding="same")
+        self.conv = make_conv2d(channels, 3, padding="same")
 
     def build(self, input_shape: tf.TensorShape) -> None:
         input_shape = tf.TensorShape(input_shape)
@@ -427,7 +479,7 @@ class DecoderStage(tf.keras.layers.Layer):
             self.upsample = tf.keras.Sequential(
                 [
                     Upsample(out_channels),
-                    tf.keras.layers.Conv2D(next_channels, 3, padding="same"),
+                    make_conv2d(next_channels, 3, padding="same"),
                 ]
             )
         else:
@@ -484,7 +536,7 @@ class Encoder(tf.keras.Model):
         super().__init__()
         self.latent_channels = latent_channels
         self.use_attention_at = set(use_attention_at)
-        self.conv_in = tf.keras.layers.Conv2D(base_channels, 3, padding="same")
+        self.conv_in = make_conv2d(base_channels, 3, padding="same")
 
         self.stages = []
         in_ch = base_channels
@@ -507,8 +559,7 @@ class Encoder(tf.keras.Model):
         final_ch = base_channels * channel_multipliers[-1]
         self.norm_out = get_norm_layer(final_ch, norm_type, norm_num_groups)
         self.act_out = get_activation(activation)
-        self.conv_out = tf.keras.layers.Conv2D(
-            2 * latent_channels, 3, padding="same")
+        self.conv_out = make_conv2d(2 * latent_channels, 3, padding="same")
 
     def call(self, x: tf.Tensor, training: bool = False) -> Tuple[tf.Tensor, tf.Tensor]:
         h = self.conv_in(x)
@@ -547,7 +598,7 @@ class Decoder(tf.keras.Model):
         self.use_attention_at = set(use_attention_at)
         channel_multipliers_rev = tuple(reversed(channel_multipliers))
         first_ch = base_channels * channel_multipliers_rev[0]
-        self.conv_in = tf.keras.layers.Conv2D(first_ch, 3, padding="same")
+        self.conv_in = make_conv2d(first_ch, 3, padding="same")
 
         self.stages = []
         in_ch = first_ch
@@ -574,7 +625,7 @@ class Decoder(tf.keras.Model):
         final_ch = base_channels * channel_multipliers_rev[-1]
         self.norm_out = get_norm_layer(final_ch, norm_type, norm_num_groups)
         self.act_out = get_activation(activation)
-        self.conv_out = tf.keras.layers.Conv2D(out_channels, 3, padding="same")
+        self.conv_out = make_conv2d(out_channels, 3, padding="same")
 
     def call(self, z: tf.Tensor, training: bool = False) -> tf.Tensor:
         h = self.conv_in(z)
@@ -850,13 +901,15 @@ def run_train_step(
     model: VAE,
     x: tf.Tensor,
     kl_weight: tf.Tensor,
+    optimizer: tf.keras.optimizers.Optimizer,
 ) -> Tuple[Dict[str, tf.Tensor], tf.Tensor, Any]:
     with tf.GradientTape() as tape:
         outputs = model(x, kl_weight=kl_weight,
                         return_latent=True, training=True)
         loss = tf.cast(outputs["loss"], tf.float32)
+        gradient_loss = optimizer.scale_loss(loss) if hasattr(optimizer, "scale_loss") else loss
 
-    gradients = tape.gradient(loss, model.trainable_variables)
+    gradients = tape.gradient(gradient_loss, model.trainable_variables)
     return outputs, loss, gradients
 
 
@@ -897,6 +950,7 @@ def train_epoch(
             model,
             x,
             tf.convert_to_tensor(kl_weight, dtype=tf.float32),
+            optimizer,
         )
 
         if check_for_nan(loss, "loss"):
@@ -919,9 +973,6 @@ def train_epoch(
         if has_nonfinite_gradients(gradients, variables):
             print(f"Skipping batch {batch_idx} due to non-finite gradients")
             continue
-
-        if max_grad_norm is not None:
-            gradients, _ = tf.clip_by_global_norm(gradients, max_grad_norm)
 
         optimizer.apply_gradients(zip(gradients, variables))
 
@@ -1417,6 +1468,23 @@ def save_metadata(
         json.dump(payload, handle, indent=2)
 
 
+def create_optimizer(config: VAEConfig) -> tf.keras.optimizers.Optimizer:
+    optimizer = tf.keras.optimizers.AdamW(
+        learning_rate=config.learning_rate,
+        beta_1=config.betas[0],
+        beta_2=config.betas[1],
+        epsilon=1e-8,
+        amsgrad=False,
+        weight_decay=config.weight_decay,
+        global_clipnorm=config.max_grad_norm,
+    )
+
+    if config.use_amp:
+        return mixed_precision.LossScaleOptimizer(optimizer)
+
+    return optimizer
+
+
 def main() -> None:
     if not TF_AVAILABLE:
         raise ImportError(
@@ -1487,12 +1555,7 @@ def main() -> None:
                         for var in model.trainable_variables]))
     print(f"Model parameters: {num_params:,} ({num_trainable:,} trainable)")
 
-    optimizer = tf.keras.optimizers.AdamW(
-        learning_rate=config.learning_rate,
-        beta_1=config.betas[0],
-        beta_2=config.betas[1],
-        weight_decay=config.weight_decay,
-    )
+    optimizer = create_optimizer(config)
     kl_scheduler = CyclicKLScheduler(
         beta=config.beta, cycle_steps=config.kl_warmup_steps, ratio=0.5)
 
