@@ -165,6 +165,7 @@ def main() -> None:
     print(f"Using device: {'GPU' if use_gpu else 'CPU'}")
     if use_gpu:
         print(f"GPUs detected: {len(tf.config.list_physical_devices('GPU'))}")
+    use_xla = use_gpu
 
     channel_multipliers = tuple(int(x) for x in args.channel_multipliers.split(",") if x)
     use_attention_at = tuple(int(x) for x in args.use_attention_at.split(",") if x)
@@ -202,6 +203,7 @@ def main() -> None:
     print(f"  KL warmup steps: {config.kl_warmup_steps}")
     print(f"  Recon loss type: {config.recon_loss_type}")
     print(f"  Mixed precision: {config.use_amp}")
+    print(f"  XLA JIT: {use_xla}")
     print()
 
     model = VAE(config=config)
@@ -300,6 +302,7 @@ def main() -> None:
             log_interval=args.log_interval,
             total_batches=steps_per_epoch,
             progress_desc=f"Train {epoch + 1}/{args.epochs}",
+            use_xla=use_xla,
         )
 
         current_kl_weight = kl_scheduler(global_step)
@@ -309,6 +312,7 @@ def main() -> None:
             kl_weight=current_kl_weight,
             total_batches=val_steps,
             progress_desc=f"Val {epoch + 1}/{args.epochs}",
+            use_xla=use_xla,
         )
 
         with writer.as_default():

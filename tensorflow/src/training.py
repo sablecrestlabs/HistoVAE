@@ -132,8 +132,7 @@ def run_train_step(
     return outputs, loss, gradients
 
 
-@tf.function(reduce_retracing=True)
-def run_train_step_compiled(
+def _run_train_step_compiled_impl(
     model: Any,
     x: tf.Tensor,
     kl_weight: tf.Tensor,
@@ -162,12 +161,49 @@ def run_train_step_compiled(
 
 
 @tf.function(reduce_retracing=True)
-def run_eval_step(
+def run_train_step_compiled(
+    model: Any,
+    x: tf.Tensor,
+    kl_weight: tf.Tensor,
+    optimizer: tf.keras.optimizers.Optimizer,
+) -> Tuple[Dict[str, tf.Tensor], tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+    return _run_train_step_compiled_impl(model, x, kl_weight, optimizer)
+
+
+@tf.function(reduce_retracing=True, jit_compile=True)
+def run_train_step_xla(
+    model: Any,
+    x: tf.Tensor,
+    kl_weight: tf.Tensor,
+    optimizer: tf.keras.optimizers.Optimizer,
+) -> Tuple[Dict[str, tf.Tensor], tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+    return _run_train_step_compiled_impl(model, x, kl_weight, optimizer)
+
+
+def _run_eval_step_impl(
     model: Any,
     x: tf.Tensor,
     kl_weight: tf.Tensor,
 ) -> Dict[str, tf.Tensor]:
     return model(x, kl_weight=kl_weight, return_latent=False, training=False)
+
+
+@tf.function(reduce_retracing=True)
+def run_eval_step(
+    model: Any,
+    x: tf.Tensor,
+    kl_weight: tf.Tensor,
+) -> Dict[str, tf.Tensor]:
+    return _run_eval_step_impl(model, x, kl_weight)
+
+
+@tf.function(reduce_retracing=True, jit_compile=True)
+def run_eval_step_xla(
+    model: Any,
+    x: tf.Tensor,
+    kl_weight: tf.Tensor,
+) -> Dict[str, tf.Tensor]:
+    return _run_eval_step_impl(model, x, kl_weight)
 
 
 def train_epoch(
@@ -183,6 +219,7 @@ def train_epoch(
     image_log_interval: int = 1000,
     total_batches: Optional[int] = None,
     progress_desc: Optional[str] = None,
+    use_xla: bool = False,
 ) -> Tuple[Dict[str, float], int]:
     del max_grad_norm
 
@@ -191,6 +228,7 @@ def train_epoch(
     total_kl_loss = 0.0
     num_batches = 0
     progress = _create_progress(total_batches, progress_desc or f"Train {epoch + 1}")
+    compiled_train_step = run_train_step_xla if use_xla else run_train_step_compiled
 
     for batch_idx, x in enumerate(dataset):
         if progress is not None:
@@ -202,7 +240,7 @@ def train_epoch(
             print(f"Skipping batch {batch_idx} due to NaN/Inf in input data")
             continue
 
-        outputs, loss, has_gradients, finite_gradients, did_apply = run_train_step_compiled(
+        outputs, loss, has_gradients, finite_gradients, did_apply = compiled_train_step(
             model,
             x,
             tf.convert_to_tensor(kl_weight, dtype=tf.float32),
@@ -273,12 +311,14 @@ def evaluate(
     max_batches: Optional[int] = None,
     total_batches: Optional[int] = None,
     progress_desc: str = "Validation",
+    use_xla: bool = False,
 ) -> Dict[str, float]:
     total_loss = 0.0
     total_recon_loss = 0.0
     total_kl_loss = 0.0
     num_batches = 0
     progress = _create_progress(total_batches, progress_desc)
+    compiled_eval_step = run_eval_step_xla if use_xla else run_eval_step
 
     for batch_idx, x in enumerate(dataset):
         if max_batches is not None and batch_idx >= max_batches:
@@ -287,7 +327,7 @@ def evaluate(
         if progress is not None:
             progress.update(1)
 
-        outputs = run_eval_step(
+        outputs = compiled_eval_step(
             model,
             x,
             tf.convert_to_tensor(kl_weight, dtype=tf.float32),

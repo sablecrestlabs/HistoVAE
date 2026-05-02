@@ -273,8 +273,14 @@ class Upsample(tf.keras.layers.Layer):
         super().build(input_shape)
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        spatial_size = tf.shape(x)[1:3] * 2
-        x = tf.image.resize(x, spatial_size, method="nearest")
+        shape = tf.shape(x)
+        batch_size = shape[0]
+        height = shape[1]
+        width = shape[2]
+        channels = shape[3]
+        x = tf.reshape(x, [batch_size, height, 1, width, 1, channels])
+        x = tf.tile(x, [1, 1, 2, 1, 2, 1])
+        x = tf.reshape(x, [batch_size, height * 2, width * 2, channels])
         return self.conv(x)
 
 
