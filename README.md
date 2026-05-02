@@ -21,10 +21,10 @@ Trained on a single RTX 5090 with default settings, this implementation demonstr
 
 - Repo-root scripts: [train_vae_pytorch.sh](train_vae_pytorch.sh), [train_vae_tf.sh](train_vae_tf.sh), [tensorboard.sh](tensorboard.sh)
 - PyTorch framework directory: [pytorch/requirements.txt](pytorch/requirements.txt)
-- PyTorch container scripts: [pytorch/build_docker.sh](pytorch/build_docker.sh), [pytorch/run_docker.sh](pytorch/run_docker.sh)
+- PyTorch container scripts: [pytorch/build_docker.sh](pytorch/build_docker.sh), [pytorch/run_docker.sh](pytorch/run_docker.sh), [pytorch/build_and_run_docker.sh](pytorch/build_and_run_docker.sh)
 - PyTorch source package: [pytorch/src/cli.py](pytorch/src/cli.py), [pytorch/src/model.py](pytorch/src/model.py), [pytorch/src/data.py](pytorch/src/data.py), [pytorch/src/layers.py](pytorch/src/layers.py), [pytorch/src/losses.py](pytorch/src/losses.py), [pytorch/src/training.py](pytorch/src/training.py), [pytorch/src/config.py](pytorch/src/config.py), [pytorch/src/runtime.py](pytorch/src/runtime.py), [pytorch/src/smoke_test.py](pytorch/src/smoke_test.py), [pytorch/src/create_onnx.py](pytorch/src/create_onnx.py), [pytorch/src/validate_ort_cuda.py](pytorch/src/validate_ort_cuda.py)
 - TensorFlow framework directory: [tensorflow/requirements.txt](tensorflow/requirements.txt)
-- TensorFlow container scripts: [tensorflow/build_docker.sh](tensorflow/build_docker.sh), [tensorflow/run_docker.sh](tensorflow/run_docker.sh)
+- TensorFlow container scripts: [tensorflow/build_docker.sh](tensorflow/build_docker.sh), [tensorflow/run_docker.sh](tensorflow/run_docker.sh), [tensorflow/build_and_run_docker.sh](tensorflow/build_and_run_docker.sh)
 - TensorFlow source package: [tensorflow/src/cli.py](tensorflow/src/cli.py), [tensorflow/src/model.py](tensorflow/src/model.py), [tensorflow/src/data.py](tensorflow/src/data.py), [tensorflow/src/layers.py](tensorflow/src/layers.py), [tensorflow/src/losses.py](tensorflow/src/losses.py), [tensorflow/src/training.py](tensorflow/src/training.py), [tensorflow/src/config.py](tensorflow/src/config.py), [tensorflow/src/runtime.py](tensorflow/src/runtime.py), [tensorflow/src/smoke_test.py](tensorflow/src/smoke_test.py)
 - Optional convenience scripts:
   - [train_vae_pytorch.sh](train_vae_pytorch.sh) (PyTorch launcher)
@@ -106,6 +106,12 @@ Or use the wrapper, which mirrors the local train script interface:
 ./pytorch/run_docker.sh /path/to/wsi_files --device cuda
 ```
 
+Or build and run in one step:
+
+```bash
+./pytorch/build_and_run_docker.sh /path/to/wsi_files --device cuda
+```
+
 For TensorFlow:
 
 ```bash
@@ -122,6 +128,12 @@ Or use the wrapper:
 
 ```bash
 ./tensorflow/run_docker.sh /path/to/wsi_files --device cuda
+```
+
+Or build and run in one step:
+
+```bash
+./tensorflow/build_and_run_docker.sh /path/to/wsi_files --device cuda
 ```
 
 If you want a shell instead of running training, override the entrypoint:
