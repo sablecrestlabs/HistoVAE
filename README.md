@@ -19,14 +19,15 @@ Trained on a single RTX 5090 with default settings, this implementation demonstr
 
 ## What’s in this repo
 
-- PyTorch root scripts: [pytorch/train_vae_pytorch.sh](pytorch/train_vae_pytorch.sh), [pytorch/requirements.txt](pytorch/requirements.txt)
+- Repo-root scripts: [train_vae_pytorch.sh](train_vae_pytorch.sh), [train_vae_tf.sh](train_vae_tf.sh), [tensorboard.sh](tensorboard.sh)
+- PyTorch framework directory: [pytorch/requirements.txt](pytorch/requirements.txt)
 - PyTorch source package: [pytorch/src/vae_pytorch.py](pytorch/src/vae_pytorch.py), [pytorch/src/cli.py](pytorch/src/cli.py), [pytorch/src/model.py](pytorch/src/model.py), [pytorch/src/data.py](pytorch/src/data.py), [pytorch/src/layers.py](pytorch/src/layers.py), [pytorch/src/losses.py](pytorch/src/losses.py), [pytorch/src/training.py](pytorch/src/training.py), [pytorch/src/config.py](pytorch/src/config.py), [pytorch/src/runtime.py](pytorch/src/runtime.py), [pytorch/src/smoke_test.py](pytorch/src/smoke_test.py), [pytorch/src/create_onnx.py](pytorch/src/create_onnx.py), [pytorch/src/validate_ort_cuda.py](pytorch/src/validate_ort_cuda.py)
-- TensorFlow root scripts: [tensorflow/train_vae_tf.sh](tensorflow/train_vae_tf.sh), [tensorflow/requirements.txt](tensorflow/requirements.txt)
+- TensorFlow framework directory: [tensorflow/requirements.txt](tensorflow/requirements.txt)
 - TensorFlow source package: [tensorflow/src/vae_tf.py](tensorflow/src/vae_tf.py), [tensorflow/src/cli.py](tensorflow/src/cli.py), [tensorflow/src/model.py](tensorflow/src/model.py), [tensorflow/src/data.py](tensorflow/src/data.py), [tensorflow/src/layers.py](tensorflow/src/layers.py), [tensorflow/src/losses.py](tensorflow/src/losses.py), [tensorflow/src/training.py](tensorflow/src/training.py), [tensorflow/src/config.py](tensorflow/src/config.py), [tensorflow/src/runtime.py](tensorflow/src/runtime.py), [tensorflow/src/smoke_test.py](tensorflow/src/smoke_test.py)
 - Optional convenience scripts:
-  - [train_vae.sh](train_vae.sh) (PyTorch example invocation)
-  - [train_vae_tf.sh](train_vae_tf.sh) (TensorFlow example invocation)
-  - [tensorboard.sh](tensorboard.sh) (runs TensorBoard via Docker)
+  - [train_vae_pytorch.sh](train_vae_pytorch.sh) (PyTorch launcher)
+  - [train_vae_tf.sh](train_vae_tf.sh) (TensorFlow launcher)
+  - [tensorboard.sh](tensorboard.sh) (runs TensorBoard for both backends via Docker)
 - Example weights: [pretrained/vae_trained.pt](pretrained/vae_trained.pt) trained on [CAMELYON17](https://camelyon17.grand-challenge.org/)
 
 ### Model/training highlights
@@ -135,10 +136,10 @@ cd pytorch
 python -m src.vae_pytorch --data-root /path/to/wsi_files
 ```
 
-Or use the convenience wrapper:
+Or use the repo-root launcher:
 
 ```bash
-./pytorch/train_vae_pytorch.sh /path/to/wsi_files
+./train_vae_pytorch.sh /path/to/wsi_files
 ```
 
 Common knobs:
@@ -160,17 +161,17 @@ By default, tiles are normalized from `[0, 1]` to `[-1, 1]` before being fed to 
 
 ### Train with TensorFlow
 
-The TensorFlow port keeps the launch surface in [tensorflow/train_vae_tf.sh](tensorflow/train_vae_tf.sh) and places the Python implementation under [tensorflow/src](tensorflow/src).
+The TensorFlow port keeps its implementation under [tensorflow/src](tensorflow/src) while the repo-root launcher delegates into that directory.
 
 ```bash
 cd tensorflow
 python -m src.vae_tf --data-root /path/to/wsi_files
 ```
 
-Or use the convenience wrapper:
+Or use the repo-root launcher:
 
 ```bash
-./tensorflow/train_vae_tf.sh /path/to/wsi_files
+./train_vae_tf.sh /path/to/wsi_files
 ```
 
 ### PyTorch Smoke Test
@@ -210,14 +211,16 @@ HistoVAE relies on [OpenSlide](https://openslide.org/) for slide access, so the 
 
 ### Monitor with TensorBoard
 
-Training logs go under `runs_vae/<timestamp>/` by default.
+PyTorch logs go under `pytorch/runs_vae/<timestamp>/` by default, and TensorFlow logs go under `tensorflow/runs_vae/<timestamp>/` by default.
 
 If you have Docker, you can run:
 
 ```bash
-# note: arguments are optional
-./tensorboard.sh runs_vae 6006
+# optional args: logdir spec, port
+./tensorboard.sh
 ```
+
+The default TensorBoard view exposes both backends in one UI as `pytorch` and `tensorflow`. To override that, pass a custom `--logdir_spec`-style first argument such as `custom:/workspace/pytorch/runs_vae`.
 
 Then open `http://localhost:6006`.
 

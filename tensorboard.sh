@@ -1,11 +1,13 @@
 #!/bin/bash
-# Run TensorBoard in Docker with the runs directory mounted
+set -euo pipefail
 
-LOGDIR="${1:-./runs_vae}"
+cd "$(dirname "$0")"
+
+LOGDIR_SPEC="${1:-pytorch:/workspace/pytorch/runs_vae,tensorflow:/workspace/tensorflow/runs_vae}"
 PORT="${2:-6006}"
 
 docker run --rm -it \
   -p "${PORT}:6006" \
-  -v "$(realpath "${LOGDIR}"):/logs:ro" \
+  -v "$PWD:/workspace:ro" \
   hkube/tensorboard \
-  tensorboard --logdir=/logs --bind_all
+  tensorboard --logdir_spec="${LOGDIR_SPEC}" --bind_all

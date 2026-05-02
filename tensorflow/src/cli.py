@@ -76,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-amp", action="store_false", dest="use_amp", help="Disable mixed precision training")
 
     parser.add_argument("--log-dir", type=str, default="runs_vae", help="TensorBoard log directory")
-    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints_vae_tf", help="Checkpoint directory")
+    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints_vae", help="Checkpoint directory")
     parser.add_argument("--log-interval", type=int, default=100, help="Steps between scalar logging")
     parser.add_argument("--save-interval", type=int, default=5, help="Epochs between checkpoints")
 
