@@ -2,8 +2,9 @@
 
 # HistoVAE
 
-[![CI Status](https://github.com/sablecrestlabs/HistoVAE/actions/workflows/python.yml/badge.svg)](https://github.com/eosin-platform/eov/actions/workflows/ci.yml)
-[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-sablecrestlabs%2Fhistovae-blue?logo=docker)](https://hub.docker.com/r/sablecrestlabs/histovae)
+[![CI Status](https://github.com/sablecrestlabs/HistoVAE/actions/workflows/python.yml/badge.svg)](https://github.com/sablecrestlabs/HistoVAE/actions/workflows/python.yml)
+[![Docker Hub PyTorch](https://img.shields.io/badge/Docker%20Hub-sablecrestlabs%2Fhistovae--pytorch-blue?logo=docker)](https://hub.docker.com/r/sablecrestlabs/histovae-pytorch)
+[![Docker Hub TensorFlow](https://img.shields.io/badge/Docker%20Hub-sablecrestlabs%2Fhistovae--tensorflow-blue?logo=docker)](https://hub.docker.com/r/sablecrestlabs/histovae-tensorflow)
 [![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen)](#status)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](#requirements)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.0%2B-EE4C2C)](https://pytorch.org/)
@@ -49,7 +50,7 @@ Implemented in [pytorch/src](pytorch/src):
 
 This repo now keeps framework-specific Dockerfiles in [pytorch/Dockerfile](pytorch/Dockerfile) and [tensorflow/Dockerfile](tensorflow/Dockerfile). To use the GPU, you’ll need:
 
-The GitHub Docker publish workflow continues to publish the PyTorch image to `sablecrestlabs/histovae:latest`, and tagged releases additionally publish `sablecrestlabs/histovae:<tag>`.
+The GitHub Docker publish workflow publishes the PyTorch image to `sablecrestlabs/histovae-pytorch:latest` and the TensorFlow image to `sablecrestlabs/histovae-tensorflow:latest`. Tagged releases additionally publish `:<tag>` variants for both images.
 
 - NVIDIA drivers installed on the host
 - Docker + NVIDIA Container Toolkit (so `--gpus all` works)
@@ -57,7 +58,8 @@ The GitHub Docker publish workflow continues to publish the PyTorch image to `sa
 ### Pull
 
 ```bash
-docker pull sablecrestlabs/histovae:latest
+docker pull sablecrestlabs/histovae-pytorch:latest
+docker pull sablecrestlabs/histovae-tensorflow:latest
 ```
 
 ### Build

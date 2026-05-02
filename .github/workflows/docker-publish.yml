@@ -10,9 +10,19 @@ on:
 
 jobs:
   publish:
-    name: Build And Push Image
+    name: Build And Push ${{ matrix.backend.name }} Image
     if: ${{ github.event_name != 'push' || github.ref_type == 'tag' || !contains(github.event.head_commit.message || '', '/noci') }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend:
+          - name: PyTorch
+            image: sablecrestlabs/histovae-pytorch
+            dockerfile: pytorch/Dockerfile
+          - name: TensorFlow
+            image: sablecrestlabs/histovae-tensorflow
+            dockerfile: tensorflow/Dockerfile
 
     steps:
       - name: Check out repository
@@ -32,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image="sablecrestlabs/histovae"
+          image="${{ matrix.backend.image }}"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
@@ -48,6 +58,6 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: pytorch/Dockerfile
+          file: ${{ matrix.backend.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
