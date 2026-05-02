@@ -57,6 +57,23 @@ def _unscale_gradients_if_needed(optimizer: Any, gradients: Any) -> Any:
     return [_manually_unscale_gradient(grad, scale) for grad in gradients]
 
 
+def _gradient_values(grad: Any) -> Any:
+    if isinstance(grad, tf.IndexedSlices):
+        return grad.values
+    return grad
+
+
+def _gradients_are_finite(gradients: Any) -> tf.Tensor:
+    finite_flags = [
+        tf.reduce_all(tf.math.is_finite(tf.cast(_gradient_values(grad), tf.float32)))
+        for grad in gradients
+        if grad is not None
+    ]
+    if not finite_flags:
+        return tf.constant(False)
+    return tf.reduce_all(tf.stack(finite_flags))
+
+
 def has_nonfinite_gradients(gradients: Any, variables: Any) -> bool:
     for grad, variable in zip(gradients, variables):
         if grad is None:
@@ -115,6 +132,36 @@ def run_train_step(
     return outputs, loss, gradients
 
 
+@tf.function(reduce_retracing=True)
+def run_train_step_compiled(
+    model: Any,
+    x: tf.Tensor,
+    kl_weight: tf.Tensor,
+    optimizer: tf.keras.optimizers.Optimizer,
+) -> Tuple[Dict[str, tf.Tensor], tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+    outputs, loss, gradients = run_train_step(model, x, kl_weight, optimizer)
+    grad_var_pairs = [
+        (grad, variable)
+        for grad, variable in zip(gradients, model.trainable_variables)
+        if grad is not None
+    ]
+    has_gradients = tf.constant(bool(grad_var_pairs))
+    finite_loss = tf.reduce_all(tf.math.is_finite(loss))
+    finite_gradients = _gradients_are_finite([grad for grad, _ in grad_var_pairs])
+
+    def apply_gradients() -> tf.Tensor:
+        optimizer.apply_gradients(grad_var_pairs)
+        return tf.constant(True)
+
+    did_apply = tf.cond(
+        tf.logical_and(finite_loss, tf.logical_and(has_gradients, finite_gradients)),
+        apply_gradients,
+        lambda: tf.constant(False),
+    )
+    return outputs, loss, has_gradients, finite_gradients, did_apply
+
+
+@tf.function(reduce_retracing=True)
 def run_eval_step(
     model: Any,
     x: tf.Tensor,
@@ -155,7 +202,7 @@ def train_epoch(
             print(f"Skipping batch {batch_idx} due to NaN/Inf in input data")
             continue
 
-        outputs, loss, gradients = run_train_step(
+        outputs, loss, has_gradients, finite_gradients, did_apply = run_train_step_compiled(
             model,
             x,
             tf.convert_to_tensor(kl_weight, dtype=tf.float32),
@@ -166,24 +213,17 @@ def train_epoch(
             print(f"Skipping batch {batch_idx} due to NaN loss")
             continue
 
-        grad_var_pairs = [
-            (grad, variable)
-            for grad, variable in zip(gradients, model.trainable_variables)
-            if grad is not None
-        ]
-        if not grad_var_pairs:
+        if not bool(has_gradients.numpy()):
             print(f"Skipping batch {batch_idx} due to missing gradients")
             continue
 
-        gradients, variables = zip(*grad_var_pairs)
-        gradients = list(gradients)
-        variables = list(variables)
-
-        if has_nonfinite_gradients(gradients, variables):
+        if not bool(finite_gradients.numpy()):
             print(f"Skipping batch {batch_idx} due to non-finite gradients")
             continue
 
-        optimizer.apply_gradients(zip(gradients, variables))
+        if not bool(did_apply.numpy()):
+            print(f"Skipping batch {batch_idx} because the compiled train step did not apply gradients")
+            continue
 
         loss_value = float(loss.numpy())
         recon_value = float(tf.cast(outputs["recon_loss"], tf.float32).numpy())
