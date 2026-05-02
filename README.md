@@ -12,11 +12,11 @@
 [![OpenSlide](https://img.shields.io/badge/WSI-OpenSlide-informational)](https://openslide.org/)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue)](#license)
 
-Fast-converging convolutional **Variational Autoencoder (VAE)** for **whole-slide image (WSI)** `.tif`/`.svs` files.
+Fast-converging convolutional **Variational Autoencoder (VAE)** for **whole-slide image (WSI)** files in both PyTorch *and* Tensorflow.
 
 This repo trains directly on random WSI tiles via OpenSlide and is designed to converge quickly on histology tile distributions.
 
-Trained on a single RTX 5090 with default settings, this implementation demonstrates accurate half-resolution reconstruction within about 90 seconds. Within ~15 minutes, the reconstructed tiles are only distinguishable by differences in noise patterns. This makes it suitable for real-time, human-in-the-loop workflows.
+Trained on a single RTX 5090 with default settings, this implementation demonstrates accurate reconstruction within about 30 seconds. Within minutes, the reconstructed tiles are only distinguishable by differences in noise patterns. This makes it suitable for real-time, human-in-the-loop workflows.
 
 ## What’s in this repo
 

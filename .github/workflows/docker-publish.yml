@@ -9,9 +9,37 @@ on:
   workflow_dispatch:
 
 jobs:
+  commit-message-guard:
+    name: Check Commit Message
+    runs-on: ubuntu-latest
+    outputs:
+      run_ci: ${{ steps.check.outputs.run_ci }}
+
+    steps:
+      - name: Check out triggering commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Check for /noci marker
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          message="$(git log -1 --format=%B)"
+
+          if [[ "${message}" == *"/noci"* ]]; then
+            echo "run_ci=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "run_ci=true" >> "${GITHUB_OUTPUT}"
+
   publish:
     name: Build And Push ${{ matrix.backend.name }} Image
-    if: ${{ github.event_name != 'push' || github.ref_type == 'tag' || !contains(github.event.head_commit.message || '', '/noci') }}
+    if: ${{ needs.commit-message-guard.outputs.run_ci == 'true' }}
+    needs: commit-message-guard
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
