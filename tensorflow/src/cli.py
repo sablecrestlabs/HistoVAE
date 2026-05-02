@@ -289,95 +289,101 @@ def main() -> None:
     print(f"Steps per epoch: {steps_per_epoch}")
     print()
 
-    for epoch in range(args.epochs):
-        train_metrics, global_step = train_epoch(
-            model=model,
-            dataset=train_dataset,
-            optimizer=optimizer,
-            epoch=epoch,
-            kl_scheduler=kl_scheduler,
-            global_step=global_step,
-            max_grad_norm=config.max_grad_norm,
-            writer=writer,
-            log_interval=args.log_interval,
-            total_batches=steps_per_epoch,
-            progress_desc=f"Train {epoch + 1}/{args.epochs}",
-            use_xla=use_xla,
+    try:
+        for epoch in range(args.epochs):
+            train_metrics, global_step = train_epoch(
+                model=model,
+                dataset=train_dataset,
+                optimizer=optimizer,
+                epoch=epoch,
+                kl_scheduler=kl_scheduler,
+                global_step=global_step,
+                max_grad_norm=config.max_grad_norm,
+                writer=writer,
+                log_interval=args.log_interval,
+                total_batches=steps_per_epoch,
+                progress_desc=f"Train {epoch + 1}/{args.epochs}",
+                use_xla=use_xla,
+            )
+
+            current_kl_weight = kl_scheduler(global_step)
+            val_metrics = evaluate(
+                model=model,
+                dataset=val_dataset,
+                kl_weight=current_kl_weight,
+                total_batches=val_steps,
+                progress_desc=f"Val {epoch + 1}/{args.epochs}",
+                use_xla=use_xla,
+            )
+
+            with writer.as_default():
+                tf.summary.scalar("epoch/train_loss", train_metrics["loss"], step=epoch)
+                tf.summary.scalar("epoch/train_recon_loss", train_metrics["recon_loss"], step=epoch)
+                tf.summary.scalar("epoch/train_kl_loss", train_metrics["kl_loss"], step=epoch)
+                tf.summary.scalar("epoch/val_loss", val_metrics["loss"], step=epoch)
+                tf.summary.scalar("epoch/val_recon_loss", val_metrics["recon_loss"], step=epoch)
+                tf.summary.scalar("epoch/val_kl_loss", val_metrics["kl_loss"], step=epoch)
+
+            print(
+                f"Epoch {epoch + 1}/{args.epochs} | "
+                f"Train Loss: {train_metrics['loss']:.4f} "
+                f"(recon: {train_metrics['recon_loss']:.4f}, kl: {train_metrics['kl_loss']:.4f}) | "
+                f"Val Loss: {val_metrics['loss']:.4f} | "
+                f"KL weight: {current_kl_weight:.4f}"
+            )
+
+            checkpoint.global_step.assign(global_step)
+            checkpoint.epoch.assign(epoch)
+
+            if (epoch + 1) % args.save_interval == 0 or val_metrics["loss"] < best_val_loss:
+                if (epoch + 1) % args.save_interval == 0:
+                    save_path = periodic_manager.save(checkpoint_number=epoch + 1)
+                    print(f"Saved checkpoint: {save_path}")
+                    save_metadata(
+                        args.checkpoint_dir,
+                        f"checkpoint_epoch_{epoch + 1}",
+                        epoch,
+                        global_step,
+                        train_metrics,
+                        val_metrics,
+                        config,
+                        kl_scheduler,
+                    )
+
+                if val_metrics["loss"] < best_val_loss:
+                    best_val_loss = val_metrics["loss"]
+                    save_path = best_manager.save(checkpoint_number=epoch + 1)
+                    print(f"Saved best checkpoint: {save_path}")
+                    save_metadata(
+                        args.checkpoint_dir,
+                        "checkpoint_best",
+                        epoch,
+                        global_step,
+                        train_metrics,
+                        val_metrics,
+                        config,
+                        kl_scheduler,
+                    )
+
+        final_dir = os.path.join(args.checkpoint_dir, "final")
+        os.makedirs(final_dir, exist_ok=True)
+        final_path = checkpoint.save(os.path.join(final_dir, "checkpoint_final"))
+        print(f"Saved final checkpoint: {final_path}")
+        save_metadata(
+            args.checkpoint_dir,
+            "checkpoint_final",
+            args.epochs - 1,
+            global_step,
+            None,
+            None,
+            config,
+            kl_scheduler,
         )
-
-        current_kl_weight = kl_scheduler(global_step)
-        val_metrics = evaluate(
-            model=model,
-            dataset=val_dataset,
-            kl_weight=current_kl_weight,
-            total_batches=val_steps,
-            progress_desc=f"Val {epoch + 1}/{args.epochs}",
-            use_xla=use_xla,
-        )
-
-        with writer.as_default():
-            tf.summary.scalar("epoch/train_loss", train_metrics["loss"], step=epoch)
-            tf.summary.scalar("epoch/train_recon_loss", train_metrics["recon_loss"], step=epoch)
-            tf.summary.scalar("epoch/train_kl_loss", train_metrics["kl_loss"], step=epoch)
-            tf.summary.scalar("epoch/val_loss", val_metrics["loss"], step=epoch)
-            tf.summary.scalar("epoch/val_recon_loss", val_metrics["recon_loss"], step=epoch)
-            tf.summary.scalar("epoch/val_kl_loss", val_metrics["kl_loss"], step=epoch)
-
-        print(
-            f"Epoch {epoch + 1}/{args.epochs} | "
-            f"Train Loss: {train_metrics['loss']:.4f} "
-            f"(recon: {train_metrics['recon_loss']:.4f}, kl: {train_metrics['kl_loss']:.4f}) | "
-            f"Val Loss: {val_metrics['loss']:.4f} | "
-            f"KL weight: {current_kl_weight:.4f}"
-        )
-
-        checkpoint.global_step.assign(global_step)
-        checkpoint.epoch.assign(epoch)
-
-        if (epoch + 1) % args.save_interval == 0 or val_metrics["loss"] < best_val_loss:
-            if (epoch + 1) % args.save_interval == 0:
-                save_path = periodic_manager.save(checkpoint_number=epoch + 1)
-                print(f"Saved checkpoint: {save_path}")
-                save_metadata(
-                    args.checkpoint_dir,
-                    f"checkpoint_epoch_{epoch + 1}",
-                    epoch,
-                    global_step,
-                    train_metrics,
-                    val_metrics,
-                    config,
-                    kl_scheduler,
-                )
-
-            if val_metrics["loss"] < best_val_loss:
-                best_val_loss = val_metrics["loss"]
-                save_path = best_manager.save(checkpoint_number=epoch + 1)
-                print(f"Saved best checkpoint: {save_path}")
-                save_metadata(
-                    args.checkpoint_dir,
-                    "checkpoint_best",
-                    epoch,
-                    global_step,
-                    train_metrics,
-                    val_metrics,
-                    config,
-                    kl_scheduler,
-                )
-
-    final_dir = os.path.join(args.checkpoint_dir, "final")
-    os.makedirs(final_dir, exist_ok=True)
-    final_path = checkpoint.save(os.path.join(final_dir, "checkpoint_final"))
-    print(f"Saved final checkpoint: {final_path}")
-    save_metadata(
-        args.checkpoint_dir,
-        "checkpoint_final",
-        args.epochs - 1,
-        global_step,
-        None,
-        None,
-        config,
-        kl_scheduler,
-    )
+    finally:
+        if hasattr(train_dataset, "close"):
+            train_dataset.close()
+        if hasattr(val_dataset, "close"):
+            val_dataset.close()
 
     writer.close()
     print("\nTraining complete!")

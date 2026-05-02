@@ -14,8 +14,10 @@ from .runtime import (
     ImageEnhance,
     OPENSLIDE_AVAILABLE,
     PIL_AVAILABLE,
+    TORCH_AVAILABLE,
     openslide,
     tf,
+    torch,
 )
 
 
@@ -270,6 +272,72 @@ class OpenSlideTileDataset:
                 pass
 
 
+class TorchBatchDataset(torch.utils.data.Dataset if TORCH_AVAILABLE else object):
+    """Wrap tile sampling for efficient multiprocessing batch loading."""
+
+    def __init__(self, dataset: OpenSlideTileDataset):
+        self.dataset = dataset
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, idx: int) -> np.ndarray:
+        return self.dataset[idx]
+
+
+class TorchDataLoaderAdapter:
+    """Expose a PyTorch DataLoader as an iterable of TensorFlow tensors."""
+
+    def __init__(
+        self,
+        dataset: OpenSlideTileDataset,
+        batch_size: int,
+        shuffle: bool,
+        drop_remainder: bool,
+        num_workers: int,
+    ):
+        if not TORCH_AVAILABLE:
+            raise RuntimeError("TorchDataLoaderAdapter requires torch to be installed")
+
+        loader_kwargs: Dict[str, Any] = {
+            "batch_size": batch_size,
+            "shuffle": shuffle,
+            "num_workers": num_workers,
+            "pin_memory": True,
+            "drop_last": drop_remainder,
+        }
+        if num_workers > 0:
+            loader_kwargs["persistent_workers"] = True
+            loader_kwargs["prefetch_factor"] = 4
+
+        self.loader = torch.utils.data.DataLoader(
+            TorchBatchDataset(dataset),
+            **loader_kwargs,
+        )
+
+    def __iter__(self) -> Generator[tf.Tensor, None, None]:
+        for batch in self.loader:
+            if isinstance(batch, torch.Tensor):
+                batch_np = batch.detach().cpu().numpy()
+            else:
+                batch_np = np.asarray(batch, dtype=np.float32)
+            yield tf.convert_to_tensor(batch_np, dtype=tf.float32)
+
+    def __len__(self) -> int:
+        return len(self.loader)
+
+    def close(self) -> None:
+        iterator = getattr(self.loader, "_iterator", None)
+        if iterator is not None and hasattr(iterator, "_shutdown_workers"):
+            iterator._shutdown_workers()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
 def create_dataset(
     dataset: OpenSlideTileDataset,
     batch_size: int,
@@ -278,7 +346,16 @@ def create_dataset(
     shuffle: bool,
     drop_remainder: bool,
     num_workers: int,
-) -> tf.data.Dataset:
+) -> Any:
+    if TORCH_AVAILABLE:
+        return TorchDataLoaderAdapter(
+            dataset=dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            drop_remainder=drop_remainder,
+            num_workers=num_workers,
+        )
+
     output_signature = tf.TensorSpec(
         shape=(img_size, img_size, img_channels), dtype=tf.float32
     )

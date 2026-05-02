@@ -30,3 +30,11 @@ except ImportError:
     PIL_AVAILABLE = False
     Image = None
     ImageEnhance = None
+
+try:
+    import torch
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
