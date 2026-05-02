@@ -25,6 +25,38 @@ def check_for_nan(loss: tf.Tensor, name: str = "loss") -> bool:
     return False
 
 
+def _scale_loss_if_needed(optimizer: Any, loss: tf.Tensor) -> tf.Tensor:
+    if hasattr(optimizer, "get_scaled_loss"):
+        return optimizer.get_scaled_loss(loss)
+    if hasattr(optimizer, "scale_loss"):
+        return optimizer.scale_loss(loss)
+    return loss
+
+
+def _manually_unscale_gradient(grad: Any, scale: tf.Tensor) -> Any:
+    if grad is None:
+        return None
+    if isinstance(grad, tf.IndexedSlices):
+        return tf.IndexedSlices(
+            values=tf.cast(grad.values, tf.float32) / scale,
+            indices=grad.indices,
+            dense_shape=grad.dense_shape,
+        )
+    return tf.cast(grad, tf.float32) / scale
+
+
+def _unscale_gradients_if_needed(optimizer: Any, gradients: Any) -> Any:
+    if hasattr(optimizer, "get_unscaled_gradients"):
+        return optimizer.get_unscaled_gradients(gradients)
+
+    loss_scale_factor = getattr(optimizer, "loss_scale_factor", None)
+    if loss_scale_factor is None:
+        return gradients
+
+    scale = tf.cast(loss_scale_factor, tf.float32)
+    return [_manually_unscale_gradient(grad, scale) for grad in gradients]
+
+
 def has_nonfinite_gradients(gradients: Any, variables: Any) -> bool:
     for grad, variable in zip(gradients, variables):
         if grad is None:
@@ -67,7 +99,6 @@ def log_images(
         tf.summary.image(f"{prefix}/orig_vs_recon", combined, step=step, max_outputs=1)
 
 
-@tf.function(reduce_retracing=True)
 def run_train_step(
     model: Any,
     x: tf.Tensor,
@@ -77,13 +108,13 @@ def run_train_step(
     with tf.GradientTape() as tape:
         outputs = model(x, kl_weight=kl_weight, return_latent=True, training=True)
         loss = tf.cast(outputs["loss"], tf.float32)
-        gradient_loss = optimizer.scale_loss(loss) if hasattr(optimizer, "scale_loss") else loss
+        gradient_loss = _scale_loss_if_needed(optimizer, loss)
 
     gradients = tape.gradient(gradient_loss, model.trainable_variables)
+    gradients = _unscale_gradients_if_needed(optimizer, gradients)
     return outputs, loss, gradients
 
 
-@tf.function(reduce_retracing=True)
 def run_eval_step(
     model: Any,
     x: tf.Tensor,

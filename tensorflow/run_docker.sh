@@ -30,6 +30,6 @@ docker run --rm "${TTY_ARGS[@]}" "${GPU_ARGS[@]}" \
 	-e XLA_FLAGS="$XLA_FLAGS_VALUE" \
 	-v "$DATA_ROOT:/data:ro" \
 	-v "$SCRIPT_DIR/runs_vae:/workspace/tensorflow/runs_vae" \
-	-v "$SCRIPT_DIR/checkpoints_vae_tf:/workspace/tensorflow/checkpoints_vae_tf" \
+	-v "$SCRIPT_DIR/checkpoints_vae:/workspace/tensorflow/checkpoints_vae" \
 	"$IMAGE_NAME" \
 	--data-root /data "$@"

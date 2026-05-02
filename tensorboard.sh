@@ -3,6 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+mkdir -p pytorch/runs_vae
+mkdir -p tensorflow/runs_vae
+
 LOGDIR_SPEC="${1:-pytorch:/workspace/pytorch/runs_vae,tensorflow:/workspace/tensorflow/runs_vae}"
 PORT="${2:-6006}"
 

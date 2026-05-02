@@ -84,7 +84,7 @@ TensorFlow uses NVIDIA's TensorFlow NGC image as its base so the container ships
   --build-arg NVIDIA_TENSORFLOW_TAG=25.02-tf2-py3
 ```
 
-The TensorFlow image and wrapper also default to disabling TensorFlow's XLA device exposure and Triton GEMM path inside the container. On RTX 5090 / Blackwell-class GPUs this avoids the repeated `+ptx85` feature warnings some NGC TensorFlow 2.17 builds emit at runtime. To opt back in for debugging or performance experiments, set `HISTOVAE_TF_XLA_FLAGS` and/or `HISTOVAE_XLA_FLAGS` before running [tensorflow/run_docker.sh](tensorflow/run_docker.sh), or pass replacement `TF_XLA_FLAGS` / `XLA_FLAGS` directly to `docker run`.
+The TensorFlow image and wrapper also default to disabling TensorFlow's XLA device exposure and Triton GEMM path inside the container. You can still override `HISTOVAE_TF_XLA_FLAGS` and/or `HISTOVAE_XLA_FLAGS` before running [tensorflow/run_docker.sh](tensorflow/run_docker.sh), or pass replacement `TF_XLA_FLAGS` / `XLA_FLAGS` directly to `docker run`.
 
 ### Train (mount host data directory)
 
