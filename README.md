@@ -19,7 +19,8 @@ Trained on a single RTX 5090 with default settings, this implementation demonstr
 
 ## What’s in this repo
 
-- Primary PyTorch training script: [vae.py](vae.py)
+- PyTorch root scripts: [pytorch/train_vae_pytorch.sh](pytorch/train_vae_pytorch.sh), [pytorch/requirements.txt](pytorch/requirements.txt)
+- PyTorch source package: [pytorch/src/vae_pytorch.py](pytorch/src/vae_pytorch.py), [pytorch/src/cli.py](pytorch/src/cli.py), [pytorch/src/model.py](pytorch/src/model.py), [pytorch/src/data.py](pytorch/src/data.py), [pytorch/src/layers.py](pytorch/src/layers.py), [pytorch/src/losses.py](pytorch/src/losses.py), [pytorch/src/training.py](pytorch/src/training.py), [pytorch/src/config.py](pytorch/src/config.py), [pytorch/src/runtime.py](pytorch/src/runtime.py), [pytorch/src/smoke_test.py](pytorch/src/smoke_test.py), [pytorch/src/create_onnx.py](pytorch/src/create_onnx.py), [pytorch/src/validate_ort_cuda.py](pytorch/src/validate_ort_cuda.py)
 - TensorFlow root scripts: [tensorflow/train_vae_tf.sh](tensorflow/train_vae_tf.sh), [tensorflow/requirements.txt](tensorflow/requirements.txt)
 - TensorFlow source package: [tensorflow/src/vae_tf.py](tensorflow/src/vae_tf.py), [tensorflow/src/cli.py](tensorflow/src/cli.py), [tensorflow/src/model.py](tensorflow/src/model.py), [tensorflow/src/data.py](tensorflow/src/data.py), [tensorflow/src/layers.py](tensorflow/src/layers.py), [tensorflow/src/losses.py](tensorflow/src/losses.py), [tensorflow/src/training.py](tensorflow/src/training.py), [tensorflow/src/config.py](tensorflow/src/config.py), [tensorflow/src/runtime.py](tensorflow/src/runtime.py), [tensorflow/src/smoke_test.py](tensorflow/src/smoke_test.py)
 - Optional convenience scripts:
@@ -30,7 +31,7 @@ Trained on a single RTX 5090 with default settings, this implementation demonstr
 
 ### Model/training highlights
 
-Implemented in [vae.py](vae.py):
+Implemented in [pytorch/src](pytorch/src):
 
 - Convolutional VAE with **spatial latents** (not flattened)
 - **Cyclic KL annealing** to reduce posterior collapse
@@ -120,7 +121,7 @@ brew install openslide
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r pytorch/requirements.txt
 ```
 
 For the TensorFlow port specifically, install [tensorflow/requirements.txt](tensorflow/requirements.txt) in the active environment.
@@ -130,13 +131,21 @@ For the TensorFlow port specifically, install [tensorflow/requirements.txt](tens
 Point `--data-root` at a directory containing WSI `.tif` / `.svs` files (case insensitive, recursively searched):
 
 ```bash
-python vae.py --data-root /path/to/wsi_files
+cd pytorch
+python -m src.vae_pytorch --data-root /path/to/wsi_files
+```
+
+Or use the convenience wrapper:
+
+```bash
+./pytorch/train_vae_pytorch.sh /path/to/wsi_files
 ```
 
 Common knobs:
 
 ```bash
-python vae.py \
+cd pytorch
+python -m src.vae_pytorch \
   --data-root /path/to/wsi_files \
   --img-size 256 \
   --batch-size 8 \
@@ -162,6 +171,15 @@ Or use the convenience wrapper:
 
 ```bash
 ./tensorflow/train_vae_tf.sh /path/to/wsi_files
+```
+
+### PyTorch Smoke Test
+
+Run a quick forward/backward verification of the PyTorch implementation with:
+
+```bash
+cd pytorch
+python -m src.smoke_test
 ```
 
 ### TensorFlow Smoke Test
@@ -205,7 +223,7 @@ Then open `http://localhost:6006`.
 
 ## Data format
 
-`vae.py` uses `OpenSlideTileDataset`, which:
+[pytorch/src/data.py](pytorch/src/data.py) provides `OpenSlideTileDataset`, which:
 
 - Recursively scans `--data-root` for `.tif` and `.svs` files (case-insensitive)
 - Randomly samples tile coordinates at a chosen OpenSlide pyramid `--level`
@@ -232,7 +250,8 @@ Checkpoints saved by training are dictionaries with at least `model_state_dict`.
 ```python
 import torch
 
-from vae import VAE, VAEConfig
+from src.config import VAEConfig
+from src.model import VAE
 
 ckpt = torch.load("checkpoints_vae/checkpoint_best.pt", map_location="cpu")
 

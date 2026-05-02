@@ -2,10 +2,9 @@
 
 import argparse
 
-import torch
-import torch.nn as nn
-
-from vae_pytorch import VAE, VAEConfig
+from .config import VAEConfig
+from .model import VAE
+from .runtime import nn, torch
 
 
 class HistoVAEReconstructONNX(nn.Module):

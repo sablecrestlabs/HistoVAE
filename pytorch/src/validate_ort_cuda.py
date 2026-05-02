@@ -9,7 +9,7 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 
-from create_onnx import export_histovae_onnx
+from .create_onnx import export_histovae_onnx
 
 
 def summarize_graph(model_path: str) -> None:
