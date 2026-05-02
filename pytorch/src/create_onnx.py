@@ -63,7 +63,6 @@ def load_histovae(checkpoint_path: str) -> VAE:
         base_channels=cfg.get("base_channels", 32),
         channel_multipliers=tuple(cfg.get("channel_multipliers", (1, 2, 4))),
         latent_channels=cfg.get("latent_channels", 32),
-
         # Important: these were not saved in older checkpoints, but they affect
         # architecture. Match the training defaults from vae.py.
         num_res_blocks_per_stage=cfg.get("num_res_blocks_per_stage", 2),

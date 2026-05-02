@@ -18,7 +18,9 @@ from .runtime import TF_AVAILABLE, TF_IMPORT_ERROR, mixed_precision, tf
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train VAE on image data with TensorFlow")
+    parser = argparse.ArgumentParser(
+        description="Train VAE on image data with TensorFlow"
+    )
 
     parser.add_argument(
         "--data-root",
@@ -26,11 +28,19 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Directory containing .tif/.svs files",
     )
-    parser.add_argument("--img-size", type=int, default=256, help="Image/tile size (default: 256)")
-    parser.add_argument("--img-channels", type=int, default=3, help="Number of image channels")
+    parser.add_argument(
+        "--img-size", type=int, default=256, help="Image/tile size (default: 256)"
+    )
+    parser.add_argument(
+        "--img-channels", type=int, default=3, help="Number of image channels"
+    )
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
-    parser.add_argument("--num-workers", type=int, default=12, help="Dataset worker thread count")
-    parser.add_argument("--tiles-per-epoch", type=int, default=10000, help="Number of tiles per epoch")
+    parser.add_argument(
+        "--num-workers", type=int, default=12, help="Dataset worker thread count"
+    )
+    parser.add_argument(
+        "--tiles-per-epoch", type=int, default=10000, help="Number of tiles per epoch"
+    )
     parser.add_argument(
         "--level",
         type=int,
@@ -44,14 +54,18 @@ def parse_args() -> argparse.Namespace:
         default=32,
         help="Base channel count (default: 32 for ~8M params)",
     )
-    parser.add_argument("--latent-channels", type=int, default=32, help="Number of latent channels")
+    parser.add_argument(
+        "--latent-channels", type=int, default=32, help="Number of latent channels"
+    )
     parser.add_argument(
         "--channel-multipliers",
         type=str,
         default="1,2,4",
         help="Channel multipliers (comma-separated)",
     )
-    parser.add_argument("--num-res-blocks", type=int, default=2, help="Residual blocks per stage")
+    parser.add_argument(
+        "--num-res-blocks", type=int, default=2, help="Residual blocks per stage"
+    )
     parser.add_argument(
         "--use-attention-at",
         type=str,
@@ -59,12 +73,23 @@ def parse_args() -> argparse.Namespace:
         help="Spatial sizes for attention (comma-separated)",
     )
 
-    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
+    parser.add_argument(
+        "--epochs", type=int, default=100, help="Number of training epochs"
+    )
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--weight-decay", type=float, default=0.01, help="Weight decay")
-    parser.add_argument("--beta", type=float, default=0.3, help="Maximum KL weight (beta-VAE)")
-    parser.add_argument("--kl-warmup-steps", type=int, default=8000, help="Steps for KL warmup")
-    parser.add_argument("--max-grad-norm", type=float, default=1.0, help="Max gradient norm (0 to disable)")
+    parser.add_argument(
+        "--beta", type=float, default=0.3, help="Maximum KL weight (beta-VAE)"
+    )
+    parser.add_argument(
+        "--kl-warmup-steps", type=int, default=8000, help="Steps for KL warmup"
+    )
+    parser.add_argument(
+        "--max-grad-norm",
+        type=float,
+        default=1.0,
+        help="Max gradient norm (0 to disable)",
+    )
     parser.add_argument(
         "--recon-loss-type",
         type=str,
@@ -73,15 +98,38 @@ def parse_args() -> argparse.Namespace:
         help="Reconstruction loss type",
     )
 
-    parser.add_argument("--use-amp", action="store_true", default=True, help="Use mixed precision training")
-    parser.add_argument("--no-amp", action="store_false", dest="use_amp", help="Disable mixed precision training")
+    parser.add_argument(
+        "--use-amp",
+        action="store_true",
+        default=True,
+        help="Use mixed precision training",
+    )
+    parser.add_argument(
+        "--no-amp",
+        action="store_false",
+        dest="use_amp",
+        help="Disable mixed precision training",
+    )
 
-    parser.add_argument("--log-dir", type=str, default="runs_vae", help="TensorBoard log directory")
-    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints_vae", help="Checkpoint directory")
-    parser.add_argument("--log-interval", type=int, default=100, help="Steps between scalar logging")
-    parser.add_argument("--save-interval", type=int, default=5, help="Epochs between checkpoints")
+    parser.add_argument(
+        "--log-dir", type=str, default="runs_vae", help="TensorBoard log directory"
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=str,
+        default="checkpoints_vae",
+        help="Checkpoint directory",
+    )
+    parser.add_argument(
+        "--log-interval", type=int, default=100, help="Steps between scalar logging"
+    )
+    parser.add_argument(
+        "--save-interval", type=int, default=5, help="Epochs between checkpoints"
+    )
 
-    parser.add_argument("--device", type=str, default="cuda", help="Device to use (cuda or cpu)")
+    parser.add_argument(
+        "--device", type=str, default="cuda", help="Device to use (cuda or cpu)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     return parser.parse_args()
 
@@ -123,7 +171,9 @@ def save_metadata(
         "config": asdict(config),
         "kl_scheduler": kl_scheduler.state_dict(),
     }
-    with open(os.path.join(checkpoint_dir, f"{name}.json"), "w", encoding="utf-8") as handle:
+    with open(
+        os.path.join(checkpoint_dir, f"{name}.json"), "w", encoding="utf-8"
+    ) as handle:
         json.dump(payload, handle, indent=2)
 
 
@@ -167,7 +217,9 @@ def main() -> None:
         print(f"GPUs detected: {len(tf.config.list_physical_devices('GPU'))}")
     use_xla = use_gpu
 
-    channel_multipliers = tuple(int(x) for x in args.channel_multipliers.split(",") if x)
+    channel_multipliers = tuple(
+        int(x) for x in args.channel_multipliers.split(",") if x
+    )
     use_attention_at = tuple(int(x) for x in args.use_attention_at.split(",") if x)
 
     config = VAEConfig(
@@ -195,7 +247,9 @@ def main() -> None:
 
     print("\nVAE Configuration:")
     print(f"  Image size: {config.img_size}x{config.img_size}x{config.img_channels}")
-    print(f"  Latent size: {config.latent_size}x{config.latent_size}x{config.latent_channels}")
+    print(
+        f"  Latent size: {config.latent_size}x{config.latent_size}x{config.latent_channels}"
+    )
     print(f"  Base channels: {config.base_channels}")
     print(f"  Channel multipliers: {config.channel_multipliers}")
     print(f"  Attention at: {config.use_attention_at}")
@@ -207,15 +261,21 @@ def main() -> None:
     print()
 
     model = VAE(config=config)
-    dummy_input = tf.zeros([1, config.img_size, config.img_size, config.img_channels], dtype=tf.float32)
+    dummy_input = tf.zeros(
+        [1, config.img_size, config.img_size, config.img_channels], dtype=tf.float32
+    )
     model(dummy_input, training=False)
 
     num_params = int(np.sum([np.prod(var.shape) for var in model.variables]))
-    num_trainable = int(np.sum([np.prod(var.shape) for var in model.trainable_variables]))
+    num_trainable = int(
+        np.sum([np.prod(var.shape) for var in model.trainable_variables])
+    )
     print(f"Model parameters: {num_params:,} ({num_trainable:,} trainable)")
 
     optimizer = create_optimizer(config)
-    kl_scheduler = CyclicKLScheduler(beta=config.beta, cycle_steps=config.kl_warmup_steps, ratio=0.5)
+    kl_scheduler = CyclicKLScheduler(
+        beta=config.beta, cycle_steps=config.kl_warmup_steps, ratio=0.5
+    )
 
     print(f"\nCreating dataset from TIF files in: {args.data_root}")
     train_dataset_obj = OpenSlideTileDataset(
@@ -318,11 +378,19 @@ def main() -> None:
 
             with writer.as_default():
                 tf.summary.scalar("epoch/train_loss", train_metrics["loss"], step=epoch)
-                tf.summary.scalar("epoch/train_recon_loss", train_metrics["recon_loss"], step=epoch)
-                tf.summary.scalar("epoch/train_kl_loss", train_metrics["kl_loss"], step=epoch)
+                tf.summary.scalar(
+                    "epoch/train_recon_loss", train_metrics["recon_loss"], step=epoch
+                )
+                tf.summary.scalar(
+                    "epoch/train_kl_loss", train_metrics["kl_loss"], step=epoch
+                )
                 tf.summary.scalar("epoch/val_loss", val_metrics["loss"], step=epoch)
-                tf.summary.scalar("epoch/val_recon_loss", val_metrics["recon_loss"], step=epoch)
-                tf.summary.scalar("epoch/val_kl_loss", val_metrics["kl_loss"], step=epoch)
+                tf.summary.scalar(
+                    "epoch/val_recon_loss", val_metrics["recon_loss"], step=epoch
+                )
+                tf.summary.scalar(
+                    "epoch/val_kl_loss", val_metrics["kl_loss"], step=epoch
+                )
 
             print(
                 f"Epoch {epoch + 1}/{args.epochs} | "
@@ -335,7 +403,9 @@ def main() -> None:
             checkpoint.global_step.assign(global_step)
             checkpoint.epoch.assign(epoch)
 
-            if (epoch + 1) % args.save_interval == 0 or val_metrics["loss"] < best_val_loss:
+            if (epoch + 1) % args.save_interval == 0 or val_metrics[
+                "loss"
+            ] < best_val_loss:
                 if (epoch + 1) % args.save_interval == 0:
                     save_path = periodic_manager.save(checkpoint_number=epoch + 1)
                     print(f"Saved checkpoint: {save_path}")

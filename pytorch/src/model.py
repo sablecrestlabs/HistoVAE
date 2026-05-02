@@ -55,7 +55,9 @@ class Encoder(nn.Module):
         final_ch = base_channels * channel_multipliers[-1]
         self.norm_out = get_norm_layer(final_ch, norm_type, norm_num_groups)
         self.act_out = get_activation(activation)
-        self.conv_out = nn.Conv2d(final_ch, 2 * latent_channels, kernel_size=3, padding=1)
+        self.conv_out = nn.Conv2d(
+            final_ch, 2 * latent_channels, kernel_size=3, padding=1
+        )
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         h = self.conv_in(x)
@@ -197,7 +199,9 @@ class VAE(nn.Module):
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         return self.decoder(z)
 
-    def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor, training: bool = True) -> torch.Tensor:
+    def reparameterize(
+        self, mu: torch.Tensor, logvar: torch.Tensor, training: bool = True
+    ) -> torch.Tensor:
         logvar = torch.clamp(logvar, min=-10.0, max=5.0)
         mu = torch.clamp(mu, min=-10.0, max=10.0)
         if training:

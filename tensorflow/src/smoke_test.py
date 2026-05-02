@@ -37,7 +37,9 @@ def main() -> None:
 
     model = VAE(config=config)
     optimizer = create_optimizer(config)
-    inputs = tf.random.normal([2, config.img_size, config.img_size, config.img_channels])
+    inputs = tf.random.normal(
+        [2, config.img_size, config.img_size, config.img_channels]
+    )
 
     outputs = model(inputs, training=False)
     train_outputs, loss, gradients = run_train_step(

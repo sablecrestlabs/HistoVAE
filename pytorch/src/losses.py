@@ -7,7 +7,9 @@ from typing import Any, Dict
 from .runtime import F, torch
 
 
-def kl_divergence(mu: torch.Tensor, logvar: torch.Tensor, free_nats: float = 0.5) -> torch.Tensor:
+def kl_divergence(
+    mu: torch.Tensor, logvar: torch.Tensor, free_nats: float = 0.5
+) -> torch.Tensor:
     logvar = torch.clamp(logvar, min=-10.0, max=5.0)
     mu = torch.clamp(mu, min=-10.0, max=10.0)
     kl = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())

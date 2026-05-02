@@ -150,12 +150,16 @@ def train_epoch(
 
         if writer is not None and global_step % log_interval == 0:
             writer.add_scalar("train/loss", loss.item(), global_step)
-            writer.add_scalar("train/recon_loss", outputs["recon_loss"].item(), global_step)
+            writer.add_scalar(
+                "train/recon_loss", outputs["recon_loss"].item(), global_step
+            )
             writer.add_scalar("train/kl_loss", outputs["kl_loss"].item(), global_step)
             writer.add_scalar("train/kl_weight", kl_weight, global_step)
             if "mu" in outputs and "logvar" in outputs:
                 writer.add_histogram("train/mu", outputs["mu"].detach(), global_step)
-                writer.add_histogram("train/logvar", outputs["logvar"].detach(), global_step)
+                writer.add_histogram(
+                    "train/logvar", outputs["logvar"].detach(), global_step
+                )
 
         if writer is not None and global_step % image_log_interval == 0:
             log_images(writer, x, outputs["x_recon"], global_step, prefix="train")

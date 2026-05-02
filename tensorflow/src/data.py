@@ -10,11 +10,11 @@ from typing import Any, Dict, Generator, Optional, Tuple
 import numpy as np
 
 from .runtime import (
-    Image,
-    ImageEnhance,
     OPENSLIDE_AVAILABLE,
     PIL_AVAILABLE,
     TORCH_AVAILABLE,
+    Image,
+    ImageEnhance,
     openslide,
     tf,
     torch,
@@ -70,10 +70,18 @@ class OpenSlideTileDataset:
         self.tif_files += glob.glob(os.path.join(data_root, "*.TIF"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.svs"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.SVS"))
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.tif"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.TIF"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.svs"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.SVS"), recursive=True)
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.tif"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.TIF"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.svs"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.SVS"), recursive=True
+        )
         self.tif_files = list(set(self.tif_files))
 
         if not self.tif_files:
@@ -171,9 +179,7 @@ class OpenSlideTileDataset:
 
                 arr = np.array(img)
                 near_black_mask = (
-                    (arr[:, :, 0] < 4)
-                    & (arr[:, :, 1] < 4)
-                    & (arr[:, :, 2] < 4)
+                    (arr[:, :, 0] < 4) & (arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
                 )
                 arr[near_black_mask] = [255, 255, 255]
                 img = Image.fromarray(arr)

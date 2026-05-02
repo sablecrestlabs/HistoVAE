@@ -204,7 +204,9 @@ class VAE(tf.keras.Model):
             activation=activation,
         )
 
-    def encode(self, x: tf.Tensor, training: bool = False) -> Tuple[tf.Tensor, tf.Tensor]:
+    def encode(
+        self, x: tf.Tensor, training: bool = False
+    ) -> Tuple[tf.Tensor, tf.Tensor]:
         return self.encoder(x, training=training)
 
     def decode(self, z: tf.Tensor, training: bool = False) -> tf.Tensor:

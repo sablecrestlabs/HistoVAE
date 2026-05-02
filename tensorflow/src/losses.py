@@ -7,7 +7,9 @@ from typing import Any, Dict
 from .runtime import tf
 
 
-def kl_divergence(mu: tf.Tensor, logvar: tf.Tensor, free_nats: float = 0.5) -> tf.Tensor:
+def kl_divergence(
+    mu: tf.Tensor, logvar: tf.Tensor, free_nats: float = 0.5
+) -> tf.Tensor:
     mu = tf.cast(mu, tf.float32)
     logvar = tf.cast(logvar, tf.float32)
     logvar = tf.clip_by_value(logvar, -10.0, 5.0)

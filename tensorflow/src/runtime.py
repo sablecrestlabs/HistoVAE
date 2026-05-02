@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 try:
-    import tensorflow as tf
     from tensorflow.keras import mixed_precision
+
+    import tensorflow as tf
 
     TF_AVAILABLE = True
     TF_IMPORT_ERROR = None

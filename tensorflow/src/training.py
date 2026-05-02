@@ -105,10 +105,17 @@ def log_images(
     )
 
     image_count = tf.shape(x)[0]
-    grid_orig = tf.reshape(tf.transpose(x, perm=[1, 0, 2, 3]), [tf.shape(x)[1], image_count * tf.shape(x)[2], tf.shape(x)[3]])
+    grid_orig = tf.reshape(
+        tf.transpose(x, perm=[1, 0, 2, 3]),
+        [tf.shape(x)[1], image_count * tf.shape(x)[2], tf.shape(x)[3]],
+    )
     grid_recon = tf.reshape(
         tf.transpose(x_recon, perm=[1, 0, 2, 3]),
-        [tf.shape(x_recon)[1], image_count * tf.shape(x_recon)[2], tf.shape(x_recon)[3]],
+        [
+            tf.shape(x_recon)[1],
+            image_count * tf.shape(x_recon)[2],
+            tf.shape(x_recon)[3],
+        ],
     )
     combined = tf.expand_dims(tf.concat([grid_orig, grid_recon], axis=0), axis=0)
 
@@ -260,7 +267,9 @@ def train_epoch(
             continue
 
         if not bool(did_apply.numpy()):
-            print(f"Skipping batch {batch_idx} because the compiled train step did not apply gradients")
+            print(
+                f"Skipping batch {batch_idx} because the compiled train step did not apply gradients"
+            )
             continue
 
         loss_value = float(loss.numpy())
@@ -286,7 +295,9 @@ def train_epoch(
                 tf.summary.scalar("train/kl_loss", kl_value, step=global_step)
                 tf.summary.scalar("train/kl_weight", kl_weight, step=global_step)
                 tf.summary.histogram("train/mu", outputs["mu"], step=global_step)
-                tf.summary.histogram("train/logvar", outputs["logvar"], step=global_step)
+                tf.summary.histogram(
+                    "train/logvar", outputs["logvar"], step=global_step
+                )
 
         if writer is not None and global_step % image_log_interval == 0:
             log_images(writer, x, outputs["x_recon"], global_step, prefix="train")

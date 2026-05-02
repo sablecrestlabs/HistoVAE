@@ -10,10 +10,10 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 
 from .runtime import (
-    Image,
     OPENSLIDE_AVAILABLE,
     PIL_AVAILABLE,
     TORCHVISION_AVAILABLE,
+    Image,
     openslide,
     torch,
     transforms,
@@ -62,10 +62,18 @@ class OpenSlideTileDataset(torch.utils.data.Dataset):
         self.tif_files += glob.glob(os.path.join(data_root, "*.TIF"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.svs"))
         self.tif_files += glob.glob(os.path.join(data_root, "*.SVS"))
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.tif"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.TIF"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.svs"), recursive=True)
-        self.tif_files += glob.glob(os.path.join(data_root, "**", "*.SVS"), recursive=True)
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.tif"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.TIF"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.svs"), recursive=True
+        )
+        self.tif_files += glob.glob(
+            os.path.join(data_root, "**", "*.SVS"), recursive=True
+        )
         self.tif_files = list(set(self.tif_files))
 
         if not self.tif_files:
@@ -87,7 +95,9 @@ class OpenSlideTileDataset(torch.utils.data.Dataset):
         else:
             self.jitter = None
 
-    def _get_slide_with_dims(self, tif_path: str) -> Optional[Tuple[Any, Tuple[int, int]]]:
+    def _get_slide_with_dims(
+        self, tif_path: str
+    ) -> Optional[Tuple[Any, Tuple[int, int]]]:
         if tif_path in self._invalid_slides:
             return None
 
@@ -112,7 +122,9 @@ class OpenSlideTileDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return self.tiles_per_epoch
 
-    def _extract_random_tile(self, max_attempts: int = 50) -> Tuple[Optional[Image.Image], str]:
+    def _extract_random_tile(
+        self, max_attempts: int = 50
+    ) -> Tuple[Optional[Image.Image], str]:
         last_attempt_info = "no attempts made"
         empty_tile_count = 0
         open_error_count = 0
@@ -129,7 +141,9 @@ class OpenSlideTileDataset(torch.utils.data.Dataset):
             max_x = dims[0] - self.tile_size
             max_y = dims[1] - self.tile_size
             if max_x <= 0 or max_y <= 0:
-                last_attempt_info = f"{os.path.basename(tif_path)} too small ({dims[0]}x{dims[1]})"
+                last_attempt_info = (
+                    f"{os.path.basename(tif_path)} too small ({dims[0]}x{dims[1]})"
+                )
                 continue
 
             x_coord = random.randint(0, max_x)
@@ -140,7 +154,9 @@ class OpenSlideTileDataset(torch.utils.data.Dataset):
                 downsample = slide.level_downsamples[level]
                 level0_x = int(x_coord * downsample)
                 level0_y = int(y_coord * downsample)
-                img = slide.read_region((level0_x, level0_y), level, (self.tile_size, self.tile_size))
+                img = slide.read_region(
+                    (level0_x, level0_y), level, (self.tile_size, self.tile_size)
+                )
 
                 if img.mode == "RGBA":
                     background = Image.new("RGB", img.size, (255, 255, 255))
@@ -151,9 +167,7 @@ class OpenSlideTileDataset(torch.utils.data.Dataset):
 
                 arr = np.array(img)
                 near_black_mask = (
-                    (arr[:, :, 0] < 4)
-                    & (arr[:, :, 1] < 4)
-                    & (arr[:, :, 2] < 4)
+                    (arr[:, :, 0] < 4) & (arr[:, :, 1] < 4) & (arr[:, :, 2] < 4)
                 )
                 arr[near_black_mask] = [255, 255, 255]
                 img = Image.fromarray(arr)
@@ -167,9 +181,7 @@ class OpenSlideTileDataset(torch.utils.data.Dataset):
                     "(black/white/uniform)"
                 )
             except Exception as exc:
-                last_attempt_info = (
-                    f"error reading {os.path.basename(tif_path)} at ({x_coord},{y_coord}): {exc}"
-                )
+                last_attempt_info = f"error reading {os.path.basename(tif_path)} at ({x_coord},{y_coord}): {exc}"
 
         debug_info = (
             f"Failed after {max_attempts} attempts. Empty tiles: {empty_tile_count}, "
