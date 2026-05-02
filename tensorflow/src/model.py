@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
-from vae_tf_config import VAEConfig
-from vae_tf_layers import (
+from .config import VAEConfig
+from .layers import (
     DecoderStage,
     EncoderStage,
     get_activation,
     get_norm_layer,
     make_conv2d,
 )
-from vae_tf_losses import kl_divergence, reconstruction_loss
-from vae_tf_runtime import tf
+from .losses import kl_divergence, reconstruction_loss
+from .runtime import tf
 
 
 class Encoder(tf.keras.Model):

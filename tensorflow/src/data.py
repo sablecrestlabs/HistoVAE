@@ -9,7 +9,7 @@ from typing import Any, Dict, Generator, Optional, Tuple
 
 import numpy as np
 
-from vae_tf_runtime import (
+from .runtime import (
     Image,
     ImageEnhance,
     OPENSLIDE_AVAILABLE,

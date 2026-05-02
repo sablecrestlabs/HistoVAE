@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from vae_tf_runtime import tf
+from .runtime import tf
 
 
 def kl_divergence(mu: tf.Tensor, logvar: tf.Tensor, free_nats: float = 0.5) -> tf.Tensor:

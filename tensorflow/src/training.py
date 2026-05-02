@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
-from vae_tf_runtime import tf
+from .runtime import tf
 
 
 def check_for_nan(loss: tf.Tensor, name: str = "loss") -> bool:

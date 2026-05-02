@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
-from vae_tf_runtime import tf
+from .runtime import tf
 
 
 class TorchConvKernelInitializer(tf.keras.initializers.Initializer):

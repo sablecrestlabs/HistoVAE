@@ -6,7 +6,7 @@ model, data pipeline, losses, and training orchestration can evolve
 independently while this script remains compatible with existing launchers.
 """
 
-from vae_tf_cli import main
+from .cli import main
 
 
 if __name__ == "__main__":

@@ -12,8 +12,8 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
-from vae_tf_config import VAEConfig
-from vae_tf_runtime import TF_AVAILABLE, TF_IMPORT_ERROR, mixed_precision, tf
+from .config import VAEConfig
+from .runtime import TF_AVAILABLE, TF_IMPORT_ERROR, mixed_precision, tf
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,10 +149,10 @@ def main() -> None:
             "TensorFlow is required to run vae_tf.py. Install tensorflow first."
         ) from TF_IMPORT_ERROR
 
-    from vae_tf_data import OpenSlideTileDataset, create_dataset
-    from vae_tf_losses import CyclicKLScheduler
-    from vae_tf_model import VAE
-    from vae_tf_training import evaluate, train_epoch
+    from .data import OpenSlideTileDataset, create_dataset
+    from .losses import CyclicKLScheduler
+    from .model import VAE
+    from .training import evaluate, train_epoch
 
     args = parse_args()
 

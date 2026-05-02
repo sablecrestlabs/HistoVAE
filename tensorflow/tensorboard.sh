@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run TensorBoard in Docker with the runs directory mounted
 
-LOGDIR="${1:-./runs_vae}"
+LOGDIR="${1:-./runs_vae_tf}"
 PORT="${2:-6006}"
 
 docker run --rm -it \

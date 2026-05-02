@@ -19,9 +19,12 @@ Trained on a single RTX 5090 with default settings, this implementation demonstr
 
 ## What’s in this repo
 
-- A single, self-contained training script: [vae.py](vae.py)
+- Primary PyTorch training script: [vae.py](vae.py)
+- TensorFlow root scripts: [tensorflow/train_vae_tf.sh](tensorflow/train_vae_tf.sh), [tensorflow/requirements.txt](tensorflow/requirements.txt)
+- TensorFlow source package: [tensorflow/src/vae_tf.py](tensorflow/src/vae_tf.py), [tensorflow/src/cli.py](tensorflow/src/cli.py), [tensorflow/src/model.py](tensorflow/src/model.py), [tensorflow/src/data.py](tensorflow/src/data.py), [tensorflow/src/layers.py](tensorflow/src/layers.py), [tensorflow/src/losses.py](tensorflow/src/losses.py), [tensorflow/src/training.py](tensorflow/src/training.py), [tensorflow/src/config.py](tensorflow/src/config.py), [tensorflow/src/runtime.py](tensorflow/src/runtime.py), [tensorflow/src/smoke_test.py](tensorflow/src/smoke_test.py)
 - Optional convenience scripts:
-  - [train_vae.sh](train_vae.sh) (example invocation)
+  - [train_vae.sh](train_vae.sh) (PyTorch example invocation)
+  - [train_vae_tf.sh](train_vae_tf.sh) (TensorFlow example invocation)
   - [tensorboard.sh](tensorboard.sh) (runs TensorBoard via Docker)
 - Example weights: [pretrained/vae_trained.pt](pretrained/vae_trained.pt) trained on [CAMELYON17](https://camelyon17.grand-challenge.org/)
 
@@ -120,6 +123,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+For the TensorFlow port specifically, install [tensorflow/requirements.txt](tensorflow/requirements.txt) in the active environment.
+
 ### Train
 
 Point `--data-root` at a directory containing WSI `.tif` / `.svs` files (case insensitive, recursively searched):
@@ -143,6 +148,30 @@ python vae.py \
 ```
 
 By default, tiles are normalized from `[0, 1]` to `[-1, 1]` before being fed to the model.
+
+### Train with TensorFlow
+
+The TensorFlow port keeps the launch surface in [tensorflow/train_vae_tf.sh](tensorflow/train_vae_tf.sh) and places the Python implementation under [tensorflow/src](tensorflow/src).
+
+```bash
+cd tensorflow
+python -m src.vae_tf --data-root /path/to/wsi_files
+```
+
+Or use the convenience wrapper:
+
+```bash
+./tensorflow/train_vae_tf.sh /path/to/wsi_files
+```
+
+### TensorFlow Smoke Test
+
+Run a quick forward/backward verification of the TensorFlow implementation with:
+
+```bash
+cd tensorflow
+python -m src.smoke_test
+```
 
 ### Supported Formats
 
