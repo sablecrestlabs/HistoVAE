@@ -10,4 +10,4 @@ fi
 
 source ./.venv/bin/activate
 cd pytorch
-python -m src.vae_pytorch --data-root "$DATA_ROOT" "$@"
+python -m src.cli --data-root "$DATA_ROOT" "$@"

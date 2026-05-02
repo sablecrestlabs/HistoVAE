@@ -223,10 +223,19 @@ def main() -> None:
             max_grad_norm=config.max_grad_norm,
             writer=writer,
             log_interval=args.log_interval,
+            total_batches=len(train_loader),
+            progress_desc=f"Train {epoch + 1}/{args.epochs}",
         )
 
         current_kl_weight = kl_scheduler(global_step)
-        val_metrics = evaluate(model=model, dataloader=val_loader, device=device, kl_weight=current_kl_weight)
+        val_metrics = evaluate(
+            model=model,
+            dataloader=val_loader,
+            device=device,
+            kl_weight=current_kl_weight,
+            total_batches=len(val_loader),
+            progress_desc=f"Val {epoch + 1}/{args.epochs}",
+        )
 
         if writer is not None:
             writer.add_scalar("epoch/train_loss", train_metrics["loss"], epoch)
@@ -285,3 +294,7 @@ def main() -> None:
         writer.close()
 
     print("\nTraining complete!")
+
+
+if __name__ == "__main__":
+    main()

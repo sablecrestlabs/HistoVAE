@@ -21,9 +21,11 @@ Trained on a single RTX 5090 with default settings, this implementation demonstr
 
 - Repo-root scripts: [train_vae_pytorch.sh](train_vae_pytorch.sh), [train_vae_tf.sh](train_vae_tf.sh), [tensorboard.sh](tensorboard.sh)
 - PyTorch framework directory: [pytorch/requirements.txt](pytorch/requirements.txt)
-- PyTorch source package: [pytorch/src/vae_pytorch.py](pytorch/src/vae_pytorch.py), [pytorch/src/cli.py](pytorch/src/cli.py), [pytorch/src/model.py](pytorch/src/model.py), [pytorch/src/data.py](pytorch/src/data.py), [pytorch/src/layers.py](pytorch/src/layers.py), [pytorch/src/losses.py](pytorch/src/losses.py), [pytorch/src/training.py](pytorch/src/training.py), [pytorch/src/config.py](pytorch/src/config.py), [pytorch/src/runtime.py](pytorch/src/runtime.py), [pytorch/src/smoke_test.py](pytorch/src/smoke_test.py), [pytorch/src/create_onnx.py](pytorch/src/create_onnx.py), [pytorch/src/validate_ort_cuda.py](pytorch/src/validate_ort_cuda.py)
+- PyTorch container scripts: [pytorch/build_docker.sh](pytorch/build_docker.sh), [pytorch/run_docker.sh](pytorch/run_docker.sh)
+- PyTorch source package: [pytorch/src/cli.py](pytorch/src/cli.py), [pytorch/src/model.py](pytorch/src/model.py), [pytorch/src/data.py](pytorch/src/data.py), [pytorch/src/layers.py](pytorch/src/layers.py), [pytorch/src/losses.py](pytorch/src/losses.py), [pytorch/src/training.py](pytorch/src/training.py), [pytorch/src/config.py](pytorch/src/config.py), [pytorch/src/runtime.py](pytorch/src/runtime.py), [pytorch/src/smoke_test.py](pytorch/src/smoke_test.py), [pytorch/src/create_onnx.py](pytorch/src/create_onnx.py), [pytorch/src/validate_ort_cuda.py](pytorch/src/validate_ort_cuda.py)
 - TensorFlow framework directory: [tensorflow/requirements.txt](tensorflow/requirements.txt)
-- TensorFlow source package: [tensorflow/src/vae_tf.py](tensorflow/src/vae_tf.py), [tensorflow/src/cli.py](tensorflow/src/cli.py), [tensorflow/src/model.py](tensorflow/src/model.py), [tensorflow/src/data.py](tensorflow/src/data.py), [tensorflow/src/layers.py](tensorflow/src/layers.py), [tensorflow/src/losses.py](tensorflow/src/losses.py), [tensorflow/src/training.py](tensorflow/src/training.py), [tensorflow/src/config.py](tensorflow/src/config.py), [tensorflow/src/runtime.py](tensorflow/src/runtime.py), [tensorflow/src/smoke_test.py](tensorflow/src/smoke_test.py)
+- TensorFlow container scripts: [tensorflow/build_docker.sh](tensorflow/build_docker.sh), [tensorflow/run_docker.sh](tensorflow/run_docker.sh)
+- TensorFlow source package: [tensorflow/src/cli.py](tensorflow/src/cli.py), [tensorflow/src/model.py](tensorflow/src/model.py), [tensorflow/src/data.py](tensorflow/src/data.py), [tensorflow/src/layers.py](tensorflow/src/layers.py), [tensorflow/src/losses.py](tensorflow/src/losses.py), [tensorflow/src/training.py](tensorflow/src/training.py), [tensorflow/src/config.py](tensorflow/src/config.py), [tensorflow/src/runtime.py](tensorflow/src/runtime.py), [tensorflow/src/smoke_test.py](tensorflow/src/smoke_test.py)
 - Optional convenience scripts:
   - [train_vae_pytorch.sh](train_vae_pytorch.sh) (PyTorch launcher)
   - [train_vae_tf.sh](train_vae_tf.sh) (TensorFlow launcher)
@@ -38,15 +40,16 @@ Implemented in [pytorch/src](pytorch/src):
 - **Cyclic KL annealing** to reduce posterior collapse
 - **Mixed precision (AMP)** support
 - TensorBoard logging (loss curves + image reconstructions)
+- Terminal batch progress bars for training and validation
 - OpenSlide-backed dataset that samples random tiles and filters empty/background tiles
 
 ## Quickstart
 
 ## Run with Docker (GPU)
 
-This repo includes a GPU-capable Docker image (Ubuntu base + CUDA-enabled PyTorch installed via pip). To use the GPU, you’ll need:
+This repo now keeps framework-specific Dockerfiles in [pytorch/Dockerfile](pytorch/Dockerfile) and [tensorflow/Dockerfile](tensorflow/Dockerfile). To use the GPU, you’ll need:
 
-The GitHub Docker publish workflow also pushes a prebuilt image to `sablecrestlabs/histovae:latest`, and tagged releases additionally publish `sablecrestlabs/histovae:<tag>`.
+The GitHub Docker publish workflow continues to publish the PyTorch image to `sablecrestlabs/histovae:latest`, and tagged releases additionally publish `sablecrestlabs/histovae:<tag>`.
 
 - NVIDIA drivers installed on the host
 - Docker + NVIDIA Container Toolkit (so `--gpus all` works)
@@ -60,19 +63,28 @@ docker pull sablecrestlabs/histovae:latest
 ### Build
 
 ```bash
-docker build -t histovae .
+./pytorch/build_docker.sh histovae-pytorch
+./tensorflow/build_docker.sh histovae-tensorflow
 ```
 
-Defaults are set in the Dockerfile (`PYTORCH_VERSION=2.10.0`, `CUDA_VERSION=13.0`). You can override them:
+PyTorch build defaults are set in [pytorch/Dockerfile](pytorch/Dockerfile) (`PYTORCH_VERSION=2.10.0`, `CUDA_VERSION=13.0`). You can override them:
 
 ```bash
-docker build -t histovae \
+./pytorch/build_docker.sh histovae-pytorch \
   --build-arg PYTORCH_VERSION=2.10.0 \
-  --build-arg CUDA_VERSION=13.0 \
-  .
+  --build-arg CUDA_VERSION=13.0
 ```
 
-The image sets `CUDA_VERSION` inside the container as an environment variable as well.
+The PyTorch image sets `CUDA_VERSION` inside the container as an environment variable as well.
+
+TensorFlow uses NVIDIA's TensorFlow NGC image as its base so the container ships with an NVIDIA-validated GPU stack rather than falling back to a generic pip wheel that JIT-compiles PTX for newer GPUs at startup. The default tag is `25.02-tf2-py3`, and you can override it:
+
+```bash
+./tensorflow/build_docker.sh histovae-tensorflow \
+  --build-arg NVIDIA_TENSORFLOW_TAG=25.02-tf2-py3
+```
+
+The TensorFlow image and wrapper also default to disabling TensorFlow's XLA device exposure and Triton GEMM path inside the container. On RTX 5090 / Blackwell-class GPUs this avoids the repeated `+ptx85` feature warnings some NGC TensorFlow 2.17 builds emit at runtime. To opt back in for debugging or performance experiments, set `HISTOVAE_TF_XLA_FLAGS` and/or `HISTOVAE_XLA_FLAGS` before running [tensorflow/run_docker.sh](tensorflow/run_docker.sh), or pass replacement `TF_XLA_FLAGS` / `XLA_FLAGS` directly to `docker run`.
 
 ### Train (mount host data directory)
 
@@ -81,11 +93,35 @@ Mount your WSI directory from the host into `/data` in the container:
 ```bash
 docker run --rm --gpus all \
   -v /host/path/to/wsi_files:/data:ro \
-  -v "$PWD/runs_vae:/workspace/runs_vae" \
-  -v "$PWD/checkpoints_vae:/workspace/checkpoints_vae" \
-  histovae \
+  -v "$PWD/pytorch/runs_vae:/workspace/pytorch/runs_vae" \
+  -v "$PWD/pytorch/checkpoints_vae:/workspace/pytorch/checkpoints_vae" \
+  histovae-pytorch \
   --data-root /data \
   --device cuda
+```
+
+Or use the wrapper, which mirrors the local train script interface:
+
+```bash
+./pytorch/run_docker.sh /path/to/wsi_files --device cuda
+```
+
+For TensorFlow:
+
+```bash
+docker run --rm --gpus all \
+  -v /host/path/to/wsi_files:/data:ro \
+  -v "$PWD/tensorflow/runs_vae:/workspace/tensorflow/runs_vae" \
+  -v "$PWD/tensorflow/checkpoints_vae_tf:/workspace/tensorflow/checkpoints_vae_tf" \
+  histovae-tensorflow \
+  --data-root /data \
+  --device cuda
+```
+
+Or use the wrapper:
+
+```bash
+./tensorflow/run_docker.sh /path/to/wsi_files --device cuda
 ```
 
 If you want a shell instead of running training, override the entrypoint:
@@ -94,7 +130,7 @@ If you want a shell instead of running training, override the entrypoint:
 docker run --rm -it --gpus all \
   -v /host/path/to/wsi:/data:ro \
   --entrypoint bash \
-  histovae
+  histovae-pytorch
 ```
 
 ## Run on bare metal
@@ -133,7 +169,7 @@ Point `--data-root` at a directory containing WSI `.tif` / `.svs` files (case in
 
 ```bash
 cd pytorch
-python -m src.vae_pytorch --data-root /path/to/wsi_files
+python -m src.cli --data-root /path/to/wsi_files
 ```
 
 Or use the repo-root launcher:
@@ -146,7 +182,7 @@ Common knobs:
 
 ```bash
 cd pytorch
-python -m src.vae_pytorch \
+python -m src.cli \
   --data-root /path/to/wsi_files \
   --img-size 256 \
   --batch-size 8 \
@@ -165,7 +201,7 @@ The TensorFlow port keeps its implementation under [tensorflow/src](tensorflow/s
 
 ```bash
 cd tensorflow
-python -m src.vae_tf --data-root /path/to/wsi_files
+python -m src.cli --data-root /path/to/wsi_files
 ```
 
 Or use the repo-root launcher:

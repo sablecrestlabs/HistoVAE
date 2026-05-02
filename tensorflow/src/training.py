@@ -6,6 +6,17 @@ from typing import Any, Dict, Optional, Tuple
 
 from .runtime import tf
 
+try:
+    from tqdm.auto import tqdm
+except ImportError:
+    tqdm = None
+
+
+def _create_progress(total: Optional[int], desc: str) -> Any:
+    if tqdm is None:
+        return None
+    return tqdm(total=total, desc=desc, dynamic_ncols=True, leave=False)
+
 
 def check_for_nan(loss: tf.Tensor, name: str = "loss") -> bool:
     if bool(tf.reduce_any(~tf.math.is_finite(loss)).numpy()):
@@ -43,9 +54,17 @@ def log_images(
         tf.clip_by_value((x_recon[:num_images] + 1.0) / 2.0, 0.0, 1.0),
         tf.float32,
     )
-    combined = tf.concat([x, x_recon], axis=2)
+
+    image_count = tf.shape(x)[0]
+    grid_orig = tf.reshape(tf.transpose(x, perm=[1, 0, 2, 3]), [tf.shape(x)[1], image_count * tf.shape(x)[2], tf.shape(x)[3]])
+    grid_recon = tf.reshape(
+        tf.transpose(x_recon, perm=[1, 0, 2, 3]),
+        [tf.shape(x_recon)[1], image_count * tf.shape(x_recon)[2], tf.shape(x_recon)[3]],
+    )
+    combined = tf.expand_dims(tf.concat([grid_orig, grid_recon], axis=0), axis=0)
+
     with writer.as_default():
-        tf.summary.image(f"{prefix}/orig_vs_recon", combined, step=step, max_outputs=num_images)
+        tf.summary.image(f"{prefix}/orig_vs_recon", combined, step=step, max_outputs=1)
 
 
 @tf.function(reduce_retracing=True)
@@ -84,15 +103,21 @@ def train_epoch(
     writer: Optional[tf.summary.SummaryWriter] = None,
     log_interval: int = 100,
     image_log_interval: int = 1000,
+    total_batches: Optional[int] = None,
+    progress_desc: Optional[str] = None,
 ) -> Tuple[Dict[str, float], int]:
-    del epoch, max_grad_norm
+    del max_grad_norm
 
     total_loss = 0.0
     total_recon_loss = 0.0
     total_kl_loss = 0.0
     num_batches = 0
+    progress = _create_progress(total_batches, progress_desc or f"Train {epoch + 1}")
 
     for batch_idx, x in enumerate(dataset):
+        if progress is not None:
+            progress.update(1)
+
         kl_weight = kl_scheduler(global_step)
 
         if bool(tf.reduce_any(~tf.math.is_finite(x)).numpy()):
@@ -138,6 +163,13 @@ def train_epoch(
         total_kl_loss += kl_value
         num_batches += 1
 
+        if progress is not None:
+            progress.set_postfix(
+                loss=f"{loss_value:.4f}",
+                recon=f"{recon_value:.4f}",
+                kl=f"{kl_value:.4f}",
+            )
+
         if writer is not None and global_step % log_interval == 0:
             with writer.as_default():
                 tf.summary.scalar("train/loss", loss_value, step=global_step)
@@ -152,6 +184,9 @@ def train_epoch(
 
         global_step += 1
 
+    if progress is not None:
+        progress.close()
+
     metrics = {
         "loss": total_loss / max(num_batches, 1),
         "recon_loss": total_recon_loss / max(num_batches, 1),
@@ -165,25 +200,44 @@ def evaluate(
     dataset: tf.data.Dataset,
     kl_weight: float = 1.0,
     max_batches: Optional[int] = None,
+    total_batches: Optional[int] = None,
+    progress_desc: str = "Validation",
 ) -> Dict[str, float]:
     total_loss = 0.0
     total_recon_loss = 0.0
     total_kl_loss = 0.0
     num_batches = 0
+    progress = _create_progress(total_batches, progress_desc)
 
     for batch_idx, x in enumerate(dataset):
         if max_batches is not None and batch_idx >= max_batches:
             break
+
+        if progress is not None:
+            progress.update(1)
 
         outputs = run_eval_step(
             model,
             x,
             tf.convert_to_tensor(kl_weight, dtype=tf.float32),
         )
-        total_loss += float(tf.cast(outputs["loss"], tf.float32).numpy())
-        total_recon_loss += float(tf.cast(outputs["recon_loss"], tf.float32).numpy())
-        total_kl_loss += float(tf.cast(outputs["kl_loss"], tf.float32).numpy())
+        loss_value = float(tf.cast(outputs["loss"], tf.float32).numpy())
+        recon_value = float(tf.cast(outputs["recon_loss"], tf.float32).numpy())
+        kl_value = float(tf.cast(outputs["kl_loss"], tf.float32).numpy())
+        total_loss += loss_value
+        total_recon_loss += recon_value
+        total_kl_loss += kl_value
         num_batches += 1
+
+        if progress is not None:
+            progress.set_postfix(
+                loss=f"{loss_value:.4f}",
+                recon=f"{recon_value:.4f}",
+                kl=f"{kl_value:.4f}",
+            )
+
+    if progress is not None:
+        progress.close()
 
     return {
         "loss": total_loss / max(num_batches, 1),

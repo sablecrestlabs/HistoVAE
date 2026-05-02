@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import random
 from dataclasses import asdict
@@ -146,7 +147,7 @@ def create_optimizer(config: VAEConfig) -> tf.keras.optimizers.Optimizer:
 def main() -> None:
     if not TF_AVAILABLE:
         raise ImportError(
-            "TensorFlow is required to run vae_tf.py. Install tensorflow first."
+            "TensorFlow is required to run cli.py. Install tensorflow first."
         ) from TF_IMPORT_ERROR
 
     from .data import OpenSlideTileDataset, create_dataset
@@ -281,6 +282,7 @@ def main() -> None:
     global_step = 0
     best_val_loss = float("inf")
     steps_per_epoch = args.tiles_per_epoch // args.batch_size
+    val_steps = math.ceil(len(val_dataset_obj) / args.batch_size)
     print(f"\nStarting training for {args.epochs} epochs...")
     print(f"Steps per epoch: {steps_per_epoch}")
     print()
@@ -296,10 +298,18 @@ def main() -> None:
             max_grad_norm=config.max_grad_norm,
             writer=writer,
             log_interval=args.log_interval,
+            total_batches=steps_per_epoch,
+            progress_desc=f"Train {epoch + 1}/{args.epochs}",
         )
 
         current_kl_weight = kl_scheduler(global_step)
-        val_metrics = evaluate(model=model, dataset=val_dataset, kl_weight=current_kl_weight)
+        val_metrics = evaluate(
+            model=model,
+            dataset=val_dataset,
+            kl_weight=current_kl_weight,
+            total_batches=val_steps,
+            progress_desc=f"Val {epoch + 1}/{args.epochs}",
+        )
 
         with writer.as_default():
             tf.summary.scalar("epoch/train_loss", train_metrics["loss"], step=epoch)
@@ -367,3 +377,7 @@ def main() -> None:
 
     writer.close()
     print("\nTraining complete!")
+
+
+if __name__ == "__main__":
+    main()

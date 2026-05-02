@@ -48,5 +48,6 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: pytorch/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}

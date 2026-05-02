@@ -6,6 +6,17 @@ from typing import Any, Dict, Optional, Tuple
 
 from .runtime import TORCHVISION_AVAILABLE, autocast, make_grid, torch
 
+try:
+    from tqdm.auto import tqdm
+except ImportError:
+    tqdm = None
+
+
+def _create_progress(total: Optional[int], desc: str) -> Any:
+    if tqdm is None:
+        return None
+    return tqdm(total=total, desc=desc, dynamic_ncols=True, leave=False)
+
 
 def check_for_nan(loss: torch.Tensor, name: str = "loss") -> bool:
     if torch.isnan(loss).any() or torch.isinf(loss).any():
@@ -63,15 +74,20 @@ def train_epoch(
     writer: Optional[Any] = None,
     log_interval: int = 100,
     image_log_interval: int = 1000,
+    total_batches: Optional[int] = None,
+    progress_desc: Optional[str] = None,
 ) -> Tuple[Dict[str, float], int]:
-    del epoch
     model.train()
     total_loss = 0.0
     total_recon_loss = 0.0
     total_kl_loss = 0.0
     num_batches = 0
+    progress = _create_progress(total_batches, progress_desc or f"Train {epoch + 1}")
 
     for batch_idx, batch in enumerate(dataloader):
+        if progress is not None:
+            progress.update(1)
+
         x = batch[0] if isinstance(batch, (list, tuple)) else batch
         x = x.to(device)
         kl_weight = kl_scheduler(global_step)
@@ -125,6 +141,13 @@ def train_epoch(
         total_kl_loss += outputs["kl_loss"].item()
         num_batches += 1
 
+        if progress is not None:
+            progress.set_postfix(
+                loss=f"{loss.item():.4f}",
+                recon=f"{outputs['recon_loss'].item():.4f}",
+                kl=f"{outputs['kl_loss'].item():.4f}",
+            )
+
         if writer is not None and global_step % log_interval == 0:
             writer.add_scalar("train/loss", loss.item(), global_step)
             writer.add_scalar("train/recon_loss", outputs["recon_loss"].item(), global_step)
@@ -138,6 +161,9 @@ def train_epoch(
             log_images(writer, x, outputs["x_recon"], global_step, prefix="train")
 
         global_step += 1
+
+    if progress is not None:
+        progress.close()
 
     metrics = {
         "loss": total_loss / max(num_batches, 1),
@@ -154,16 +180,22 @@ def evaluate(
     device: torch.device,
     kl_weight: float = 1.0,
     max_batches: Optional[int] = None,
+    total_batches: Optional[int] = None,
+    progress_desc: str = "Validation",
 ) -> Dict[str, float]:
     model.eval()
     total_loss = 0.0
     total_recon_loss = 0.0
     total_kl_loss = 0.0
     num_batches = 0
+    progress = _create_progress(total_batches, progress_desc)
 
     for batch_idx, batch in enumerate(dataloader):
         if max_batches is not None and batch_idx >= max_batches:
             break
+
+        if progress is not None:
+            progress.update(1)
 
         x = batch[0] if isinstance(batch, (list, tuple)) else batch
         x = x.to(device)
@@ -172,6 +204,16 @@ def evaluate(
         total_recon_loss += outputs["recon_loss"].item()
         total_kl_loss += outputs["kl_loss"].item()
         num_batches += 1
+
+        if progress is not None:
+            progress.set_postfix(
+                loss=f"{outputs['loss'].item():.4f}",
+                recon=f"{outputs['recon_loss'].item():.4f}",
+                kl=f"{outputs['kl_loss'].item():.4f}",
+            )
+
+    if progress is not None:
+        progress.close()
 
     return {
         "loss": total_loss / max(num_batches, 1),

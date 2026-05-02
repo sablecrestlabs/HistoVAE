@@ -10,4 +10,4 @@ fi
 
 source ./.venv/bin/activate
 cd tensorflow
-python -m src.vae_tf --data-root "$DATA_ROOT" "$@"
+python -m src.cli --data-root "$DATA_ROOT" "$@"
